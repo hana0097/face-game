@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>얼굴 그리기 대회</title>
-<link rel="stylesheet" href="shared.css?v=2">
+<link rel="stylesheet" href="shared.css?v=3">
 <style>
   body { background: #f4f1fb; overscroll-behavior: none; }
   .wrap { max-width: 480px; margin: 0 auto; min-height: 100%; padding: max(14px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; }
@@ -82,7 +82,7 @@
 </div>
 
 <script type="module">
-import { initDB, DEMO, params, uid, esc, roomPath, avatarHTML, DEFAULT_THEME, OUTFITS, OUTFIT_COLORS, DEFAULT_OUTFIT, bodySVG } from './shared.js?v=2';
+import { initDB, DEMO, params, uid, esc, roomPath, avatarHTML, DEFAULT_THEME, OUTFITS, OUTFIT_COLORS, DEFAULT_OUTFIT, bodySVG } from './shared.js?v=3';
 
 const room = (params.get('room') || 'MAIN').toUpperCase();
 const R = roomPath(room);
@@ -114,9 +114,15 @@ const header = () => `${banner()}<div class="brand">🎨 얼굴 그리기 대회
 })().catch(e => { app.innerHTML = `<div class="center">연결에 실패했어요 😢<br><small>${esc(e.message)}</small></div>`; });
 
 /* ───────────── router ───────────── */
+let autoSent = false;
 function render(fromPlayers) {
   const phase = state.phase || 'lobby';
   const m = me();
+  // host closed the round while I was still drawing → send what I have (full size)
+  if (m && (phase === 'judging' || phase === 'results') && m.status !== 'submitted' && strokes.length && !autoSent) {
+    autoSent = true;
+    db.update(`${R}/players/${pid}`, { drawing: exportPNG(400), status: 'submitted', partial: true, submittedAt: db.now() });
+  }
   let next;
   if (!m) next = (phase === 'lobby' || phase === 'drawing') ? 'join' : 'closed';
   else if (phase === 'lobby') next = 'wait';
@@ -371,7 +377,7 @@ function renderResults() {
   if (!rev) html += '<p class="sub">곧 3위부터 발표해요! 두근두근…</p>';
   const shown = [];
   for (let i = 0; i < Math.min(rev, 3); i++) { const idx = 2 - i; if (rk[idx]) shown.unshift(idx); }
-  shown.forEach(i => { const r = rk[i]; html += `<div class="rank"><span class="medal">${MEDAL[i]}</span><img src="${players[r.id]?.drawing || ''}" alt=""><div><b>${esc(r.name)}</b><div style="font-size:13px;color:var(--muted)">「${esc(r.point)}」</div></div><b style="margin-left:auto">${results.mode === 'ai' ? r.final + '점' : '❤️ ' + r.likes}</b></div>`; });
+  shown.forEach(i => { const r = rk[i]; html += `<div class="rank"><span class="medal">${MEDAL[i]}</span><img src="${players[r.id]?.drawing || ''}" alt=""><div><b>${esc(r.name)}</b><div style="font-size:13px;color:var(--muted)">${r.point ? `「${esc(r.point)}」` : '(그리던 중 참가)'}</div></div><b style="margin-left:auto">${results.mode === 'ai' ? r.final + '점' : '❤️ ' + r.likes}</b></div>`; });
   if (rev >= 4) {
     const i = rk.findIndex(r => r.id === pid);
     if (i >= 0) {
