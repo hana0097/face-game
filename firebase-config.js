@@ -1,13 +1,10 @@
-// ─────────────────────────────────────────────────────────────
-// Firebase 콘솔 > 프로젝트 설정 > 내 앱(웹) 에서 복사한 값을 붙여넣으세요.
-// 비워두면 "데모 모드"(같은 브라우저의 탭끼리만 동작)로 실행됩니다.
-// ─────────────────────────────────────────────────────────────
+// Firebase 설정 (face-game-2161e)
 export const firebaseConfig = {
-  apiKey: "",
-  authDomain: "",
-  databaseURL: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: "AIzaSyBlaiXlV1e8D3R-6MT7axk9z2xprGXzbFM",
+  authDomain: "face-game-2161e.firebaseapp.com",
+  databaseURL: "https://face-game-2161e-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "face-game-2161e",
+  storageBucket: "face-game-2161e.firebasestorage.app",
+  messagingSenderId: "236932441406",
+  appId: "1:236932441406:web:de65b36c9526d8099cb86f"
 };
