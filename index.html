@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <script>/* auto-update: if a newer version is deployed, reload past the browser cache */
-window.APP_V = '7';
+window.APP_V = '8';
 fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
   const m = t.match(/APP_V = '(\d+)'/);
   if (m && m[1] !== window.APP_V && new URL(location.href).searchParams.get('v') !== m[1]) { const u = new URL(location.href); u.searchParams.set('v', m[1]); location.replace(u); }
@@ -384,7 +384,7 @@ function renderJudging() {
 }
 const MEDAL = ['🥇', '🥈', '🥉'];
 function renderResults() {
-  const rk = results?.ranking || []; const rev = results?.revealed || 0;
+  const rk = results?.ranking || []; const rev = Math.max(results?.revealed || 0, results?.seen || 0); // host may step back; phones keep what was already revealed
   let html = `${header()}<div class="center" style="justify-content:flex-start"><h1>🏆 결과 발표</h1>`;
   if (!rev) html += '<p class="sub">곧 3위부터 발표해요! 두근두근…</p>';
   const shown = [];
