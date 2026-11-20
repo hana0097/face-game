@@ -2,6 +2,13 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
+<script>/* auto-update: if a newer version is deployed, reload past the browser cache */
+window.APP_V = '4';
+fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
+  const m = t.match(/APP_V = '(\d+)'/);
+  if (m && m[1] !== window.APP_V && new URL(location.href).searchParams.get('v') !== m[1]) { const u = new URL(location.href); u.searchParams.set('v', m[1]); location.replace(u); }
+}).catch(() => {});
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>얼굴 그리기 대회 · 진행자 화면</title>
 <link rel="stylesheet" href="shared.css?v=3">
