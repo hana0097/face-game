@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>얼굴 그리기 대회 · 진행자 화면</title>
-<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="shared.css?v=2">
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <style>
   body { overflow: hidden; background: radial-gradient(1200px 700px at 50% 30%, #dff3ea, #bfe2d4); }
@@ -173,7 +173,7 @@
 <canvas id="confetti"></canvas>
 
 <script type="module">
-import { initDB, DEMO, params, uid, esc, roomPath, avatarHTML, DEFAULT_THEME, botFace, BOT_NAMES, BOT_POINTS, randomOutfit } from './shared.js';
+import { initDB, DEMO, params, uid, esc, roomPath, avatarHTML, DEFAULT_THEME, botFace, BOT_NAMES, BOT_POINTS, randomOutfit } from './shared.js?v=2';
 
 /* ───────────── room & settings ───────────── */
 const genCode = () => Array.from({ length: 4 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
