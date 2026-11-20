@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <script>/* auto-update: if a newer version is deployed, reload past the browser cache */
-window.APP_V = '6';
+window.APP_V = '7';
 fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
   const m = t.match(/APP_V = '(\d+)'/);
   if (m && m[1] !== window.APP_V && new URL(location.href).searchParams.get('v') !== m[1]) { const u = new URL(location.href); u.searchParams.set('v', m[1]); location.replace(u); }
@@ -395,7 +395,7 @@ function renderResults() {
     if (i >= 0) {
       const r = rk[i];
       html += `<div class="mine"><div>내 순위</div><div class="big">${i + 1}위 <small style="font-size:16px">/ ${rk.length}명 · ${r.final}점</small></div>
-        ${(r.ai?.judges || (r.ai ? [{ emoji: '🤖', name: 'AI', comment: r.ai.comment }] : [])).map(j => `<div style="margin-top:8px;font-size:14px;opacity:.95;text-align:left">${j.emoji} <b>${esc(j.name)}</b>${j.total != null ? ` ${j.total}점` : ''}<br>"${esc(j.comment || '')}"</div>`).join('')}
+        ${(r.ai?.judges || (r.ai ? [{ emoji: '🤖', name: 'AI', comment: r.ai.comment }] : [])).map(j => `<div style="margin-top:8px;font-size:14px;opacity:.95;text-align:left">${j.emoji} <b>${esc(j.name)}</b>${j.total != null ? ` ${j.total}점` : ''}<br>"${esc(j.comment || '')}"${j.reason ? `<br><span style="opacity:.75;font-size:12px">근거: ${esc(j.reason)}</span>` : ''}</div>`).join('')}
         <div style="margin-top:6px;font-size:13px;opacity:.85">${r.ai ? `AI ${r.ai.total}점 · ` : ''}❤️ ${r.likes}</div></div>`;
     }
   }
