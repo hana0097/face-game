@@ -17,9 +17,9 @@ input, textarea { font-family: inherit; }
 .av-blank { width: 80%; height: 80%; margin: 13% auto 0; border-radius: 50%; background: #f3d9bf; box-shadow: inset -8px -10px 0 rgba(0,0,0,.06); }
 .av-pencil { position: absolute; right: -2%; top: 4%; font-size: calc(var(--s) * .22); animation: wiggle .6s ease-in-out infinite alternate; }
 @keyframes wiggle { from { transform: rotate(-12deg); } to { transform: rotate(12deg); } }
-.av-body { position: relative; margin-top: calc(var(--s) * -0.12); width: calc(var(--s) * 0.82); height: calc(var(--s) * 0.62); background: linear-gradient(#fbfbfb, #e9ecef); border-radius: calc(var(--s) * .3) calc(var(--s) * .3) calc(var(--s) * .08) calc(var(--s) * .08); box-shadow: 0 6px 10px rgba(0,0,0,.15); z-index: 1; display: flex; align-items: flex-end; justify-content: center; }
-.av-collar { position: absolute; top: 0; left: 50%; width: 30%; height: 28%; transform: translateX(-50%); border-left: 2px solid #c9ced6; border-right: 2px solid #c9ced6; clip-path: polygon(0 0, 100% 0, 50% 100%); background: #dfe3e8; }
-.av-tag { width: 86%; margin-bottom: 12%; background: #fff; border: 2px solid var(--tag); border-radius: 6px; overflow: hidden; text-align: center; }
+.av-body { position: relative; margin-top: calc(var(--s) * -0.12); width: calc(var(--s) * 0.86); height: calc(var(--s) * 0.62); z-index: 1; display: flex; align-items: flex-end; justify-content: center; }
+.av-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 5px 6px rgba(0,0,0,.16)); }
+.av-tag { position: relative; width: 78%; margin-bottom: 10%; background: #fff; border: 2px solid var(--tag); border-radius: 6px; overflow: hidden; text-align: center; }
 .av-tag i { display: block; height: calc(var(--s) * .05); background: var(--tag); }
 .av-tag span { display: block; font-weight: 800; font-size: calc(var(--s) * .14); line-height: 1.35; padding: 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #1d2a5b; }
 .av-bubble { position: absolute; bottom: calc(100% - var(--s) * .05); left: 50%; transform: translateX(-50%) scale(0); transform-origin: bottom center; background: #2b2f3a; color: #fff; font-weight: 800; font-size: max(14px, calc(var(--s) * .14)); padding: .45em .8em; border-radius: 999px; white-space: nowrap; transition: transform .25s cubic-bezier(.3,1.6,.6,1); z-index: 5; pointer-events: none; }
