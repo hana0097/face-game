@@ -1,0 +1,27 @@
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+:root {
+  --bg: #cfe9df; --ink: #1f2430; --accent: #ff5a4e; --accent2: #c6f24e; --purple: #6c5ce7;
+  --card: #ffffff; --muted: #6b7280; --tag: #2f4bb3;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; }
+body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; color: var(--ink); }
+button { font-family: inherit; cursor: pointer; }
+input, textarea { font-family: inherit; }
+.hidden { display: none !important; }
+
+/* ── Avatar ── */
+.av { --s: 120px; position: absolute; width: calc(var(--s) * 1.05); display: flex; flex-direction: column; align-items: center; will-change: transform; }
+.av-head { position: relative; width: var(--s); height: var(--s); z-index: 2; }
+.av-head img { width: 100%; height: 100%; display: block; filter: drop-shadow(0 4px 6px rgba(0,0,0,.18)); }
+.av-blank { width: 80%; height: 80%; margin: 13% auto 0; border-radius: 50%; background: #f3d9bf; box-shadow: inset -8px -10px 0 rgba(0,0,0,.06); }
+.av-pencil { position: absolute; right: -2%; top: 4%; font-size: calc(var(--s) * .22); animation: wiggle .6s ease-in-out infinite alternate; }
+@keyframes wiggle { from { transform: rotate(-12deg); } to { transform: rotate(12deg); } }
+.av-body { position: relative; margin-top: calc(var(--s) * -0.12); width: calc(var(--s) * 0.82); height: calc(var(--s) * 0.62); background: linear-gradient(#fbfbfb, #e9ecef); border-radius: calc(var(--s) * .3) calc(var(--s) * .3) calc(var(--s) * .08) calc(var(--s) * .08); box-shadow: 0 6px 10px rgba(0,0,0,.15); z-index: 1; display: flex; align-items: flex-end; justify-content: center; }
+.av-collar { position: absolute; top: 0; left: 50%; width: 30%; height: 28%; transform: translateX(-50%); border-left: 2px solid #c9ced6; border-right: 2px solid #c9ced6; clip-path: polygon(0 0, 100% 0, 50% 100%); background: #dfe3e8; }
+.av-tag { width: 86%; margin-bottom: 12%; background: #fff; border: 2px solid var(--tag); border-radius: 6px; overflow: hidden; text-align: center; }
+.av-tag i { display: block; height: calc(var(--s) * .05); background: var(--tag); }
+.av-tag span { display: block; font-weight: 800; font-size: calc(var(--s) * .14); line-height: 1.35; padding: 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #1d2a5b; }
+.av-bubble { position: absolute; bottom: calc(100% - var(--s) * .05); left: 50%; transform: translateX(-50%) scale(0); transform-origin: bottom center; background: #2b2f3a; color: #fff; font-weight: 800; font-size: max(14px, calc(var(--s) * .14)); padding: .45em .8em; border-radius: 999px; white-space: nowrap; transition: transform .25s cubic-bezier(.3,1.6,.6,1); z-index: 5; pointer-events: none; }
+.av-bubble::after { content: ''; position: absolute; left: 30%; bottom: -8px; border: 8px solid transparent; border-top-color: #2b2f3a; border-bottom: 0; }
+.av.talk .av-bubble { transform: translateX(-50%) scale(1); }

@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>얼굴 그리기 대회</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  body { background: #f4f1fb; overscroll-behavior: none; }
+  .wrap { max-width: 480px; margin: 0 auto; min-height: 100%; padding: max(14px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; }
+  .brand { font-weight: 900; font-size: 15px; color: var(--purple); letter-spacing: -.02em; display: flex; justify-content: space-between; align-items: center; }
+  .brand small { color: var(--muted); font-weight: 600; }
+  .theme { margin: 6px 0 10px; font-size: 13px; color: var(--muted); }
+  .theme b { color: var(--ink); }
+  h1 { font-size: 26px; margin: 18px 0 6px; letter-spacing: -.03em; }
+  p.sub { color: var(--muted); margin: 0 0 18px; line-height: 1.5; }
+  .field { width: 100%; font-size: 18px; padding: 14px 16px; border: 2px solid #ddd6f3; border-radius: 14px; background: #fff; outline: none; }
+  .field:focus { border-color: var(--purple); }
+  .btn { width: 100%; border: 0; border-radius: 16px; padding: 16px; font-size: 18px; font-weight: 800; background: var(--accent); color: #fff; box-shadow: 0 4px 0 #c9372d; margin-top: 12px; }
+  .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #c9372d; }
+  .btn.ghost { background: #fff; color: var(--ink); box-shadow: 0 3px 0 #d9d4ea; border: 1px solid #e7e2f5; }
+  .btn:disabled { opacity: .5; }
+  .center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  .mini { position: relative; height: 220px; width: 200px; }
+  .mini .av { position: relative; left: 50%; transform: translateX(-50%); --s: 130px; }
+  .mini.bounce .av { animation: hop 1s ease-in-out infinite; }
+  @keyframes hop { 0%,100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, -18px); } }
+
+  /* drawing */
+  .tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; margin: 8px 0; }
+  .color { width: 32px; height: 32px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 1px #d6d0e8; }
+  .color.on { box-shadow: 0 0 0 3px var(--purple); transform: scale(1.1); }
+  .tbtn { border: 1px solid #e2dcf2; background: #fff; border-radius: 12px; padding: 8px 12px; font-size: 14px; font-weight: 700; color: #4b4f9e; display: inline-flex; align-items: center; gap: 4px; }
+  .tbtn.on { background: var(--purple); color: #fff; border-color: var(--purple); }
+  .size { width: 38px; height: 38px; padding: 0; justify-content: center; }
+  .size i { display: block; border-radius: 50%; background: currentColor; }
+  .skin { width: 26px; height: 26px; border-radius: 8px; border: 2px solid #fff; box-shadow: 0 0 0 1px #d6d0e8; }
+  .skin.on { box-shadow: 0 0 0 3px var(--purple); }
+  .board { position: relative; width: 100%; aspect-ratio: 1; border-radius: 20px; background: #fff; box-shadow: 0 6px 20px rgba(80,60,160,.12); overflow: hidden; touch-action: none; }
+  .board canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+  .row { display: flex; gap: 8px; }
+  .row .btn { margin-top: 10px; }
+  .hint { font-size: 12px; color: var(--muted); text-align: center; margin-top: 4px; }
+
+  /* sheet */
+  .sheet { position: fixed; inset: 0; background: rgba(20,16,40,.5); display: flex; align-items: flex-end; z-index: 10; }
+  .sheet > div { background: #fff; width: 100%; max-width: 480px; margin: 0 auto; border-radius: 24px 24px 0 0; padding: 22px 18px max(22px, env(safe-area-inset-bottom)); }
+  .sheet h2 { margin: 0 0 4px; font-size: 20px; }
+  .count { text-align: right; font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  /* gallery */
+  .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; width: 100%; }
+  .gcard { background: #fff; border-radius: 14px; padding: 8px 6px 6px; text-align: center; box-shadow: 0 2px 8px rgba(80,60,160,.08); }
+  .gcard img { width: 100%; aspect-ratio: 1; display: block; }
+  .gcard .nm { font-weight: 800; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gcard .pt { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 14px; }
+  .heart { margin-top: 4px; border: 0; background: #f6f3fd; border-radius: 999px; padding: 5px 10px; font-weight: 800; font-size: 13px; color: #888; }
+  .heart.on { background: #ffe3e6; color: #e8364b; }
+  .heart:disabled { opacity: .6; }
+  .section { width: 100%; text-align: left; font-weight: 800; margin-top: 22px; }
+  .spinner { width: 54px; height: 54px; border: 6px solid #e4def6; border-top-color: var(--purple); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 18px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .rank { background: #fff; border-radius: 16px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 8px; text-align: left; box-shadow: 0 2px 8px rgba(80,60,160,.08); }
+  .rank img { width: 56px; height: 56px; }
+  .rank .medal { font-size: 28px; }
+  .mine { background: linear-gradient(135deg, #6c5ce7, #a06cf0); color: #fff; border-radius: 20px; padding: 18px; width: 100%; margin-top: 10px; }
+  .mine .big { font-size: 34px; font-weight: 900; }
+  .demo { background: #fff3c4; color: #8a6d00; font-size: 12px; padding: 6px 10px; border-radius: 10px; margin-bottom: 8px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="center"><div class="spinner"></div>연결 중…</div>
+</div>
+
+<script type="module">
+import { initDB, DEMO, params, uid, esc, roomPath, avatarHTML, DEFAULT_THEME } from './shared.js';
+
+const room = (params.get('room') || 'MAIN').toUpperCase();
+const R = roomPath(room);
+const app = document.getElementById('app');
+const PID_KEY = `facegame-pid-${room}`;
+const STROKE_KEY = `facegame-strokes-${room}`;
+// demo mode: each tab is a separate participant
+const store = DEMO ? sessionStorage : localStorage;
+let pid = store.getItem(PID_KEY);
+let db, state = {}, players = {}, results = null, view = '';
+
+const S = 600; // internal canvas size
+const COLORS = ['#222222', '#6b4423', '#e53935', '#ff7aa8', '#ff9800', '#fdd835', '#43a047', '#1e88e5', '#8e24aa', '#ffffff'];
+const SKINS = ['#f6d7b8', '#f1c27d', '#e0ac69', '#8d5524', '#ffffff'];
+const SIZES = [6, 14, 30];
+let tool = { color: COLORS[0], size: SIZES[1], eraser: false, skin: SKINS[0] };
+let strokes = [];
+try { const saved = JSON.parse(store.getItem(STROKE_KEY)); if (saved) { strokes = saved.strokes || []; tool.skin = saved.skin || tool.skin; } } catch {}
+
+const me = () => players?.[pid];
+const banner = () => (DEMO ? '<div class="demo">데모 모드: 같은 브라우저의 탭끼리만 연결돼요</div>' : '');
+const header = () => `${banner()}<div class="brand">🎨 얼굴 그리기 대회 <small>방 ${esc(room)}</small></div><div class="theme">주제: <b>${esc(state.theme || DEFAULT_THEME)}</b></div>`;
+
+(async () => {
+  db = await initDB();
+  db.on(`${R}/state`, v => { state = v || {}; render(); });
+  db.on(`${R}/players`, v => { players = v || {}; render(true); });
+  db.on(`${R}/results`, v => { results = v; render(); });
+})().catch(e => { app.innerHTML = `<div class="center">연결에 실패했어요 😢<br><small>${esc(e.message)}</small></div>`; });
+
+/* ───────────── router ───────────── */
+function render(fromPlayers) {
+  const phase = state.phase || 'lobby';
+  const m = me();
+  let next;
+  if (!m) next = (phase === 'lobby' || phase === 'drawing') ? 'join' : 'closed';
+  else if (phase === 'lobby') next = 'wait';
+  else if (phase === 'drawing') next = m.status === 'submitted' ? 'done' : 'draw';
+  else if (phase === 'judging') next = 'judging';
+  else next = 'results';
+
+  if (next === view) {
+    // refresh dynamic parts only
+    if (view === 'done') renderGallery();
+    if (view === 'wait' && !fromPlayers) renderWait();
+    if (view === 'results') renderResults();
+    if (view === 'draw') { const t = document.getElementById('themeTxt'); if (t) t.textContent = state.theme || DEFAULT_THEME; }
+    return;
+  }
+  view = next;
+  ({ join: renderJoin, closed: renderClosed, wait: renderWait, draw: renderDraw, done: renderDone, judging: renderJudging, results: renderResults })[view]();
+}
+
+/* ───────────── join ───────────── */
+function renderJoin() {
+  app.innerHTML = `${header()}
+    <h1>반가워요! 👋</h1>
+    <p class="sub">이름을 입력하면 아바타 몸통에<br>이름표로 붙어요.</p>
+    <input class="field" id="name" maxlength="8" placeholder="이름 (최대 8자)" autocomplete="off">
+    <button class="btn" id="go">입장하기</button>`;
+  const inp = document.getElementById('name');
+  const go = async () => {
+    const name = inp.value.trim();
+    if (!name) { inp.focus(); return; }
+    document.getElementById('go').disabled = true;
+    pid = uid(); store.setItem(PID_KEY, pid);
+    strokes = []; store.removeItem(STROKE_KEY);
+    await db.set(`${R}/players/${pid}`, { name, status: 'drawing', joinedAt: db.now() });
+  };
+  document.getElementById('go').onclick = go;
+  inp.onkeydown = e => { if (e.key === 'Enter') go(); };
+}
+function renderClosed() {
+  app.innerHTML = `${header()}<div class="center"><div style="font-size:56px">⏰</div><h1>참가가 마감됐어요</h1><p class="sub">대형 화면에서 결과를 함께 봐요!</p></div>`;
+}
+
+/* ───────────── wait (lobby) ───────────── */
+function renderWait() {
+  const m = me();
+  app.innerHTML = `${header()}<div class="center">
+    <div class="mini bounce"><div class="av">${avatarHTML({ name: m.name })}</div></div>
+    <h1>${esc(m.name)}님 입장 완료!</h1>
+    <p class="sub">진행자가 시작하면 바로 그릴 수 있어요.<br>대형 화면에 내 아바타가 보이나요? 👀</p></div>`;
+}
+
+/* ───────────── draw ───────────── */
+let base, ink, bctx, ictx, drawingNow = null, dirty = false, lastPush = 0, pushTimer = null;
+
+function renderDraw() {
+  app.innerHTML = `${banner()}<div class="brand">🎨 얼굴을 그려주세요 <small>${esc(me().name)}</small></div>
+    <div class="theme">주제: <b id="themeTxt">${esc(state.theme || DEFAULT_THEME)}</b></div>
+    <div class="board" id="board"><canvas id="base" width="${S}" height="${S}"></canvas><canvas id="ink" width="${S}" height="${S}"></canvas></div>
+    <div class="tools" id="colors">${COLORS.map(c => `<button class="color" data-c="${c}" style="background:${c}" aria-label="색상"></button>`).join('')}</div>
+    <div class="tools">
+      ${SIZES.map((s, i) => `<button class="tbtn size" data-s="${s}" aria-label="굵기"><i style="width:${6 + i * 6}px;height:${6 + i * 6}px"></i></button>`).join('')}
+      <button class="tbtn" id="eraser">🩹 지우개</button>
+      <button class="tbtn" id="undo">↩ 되돌리기</button>
+      <button class="tbtn" id="clear">🗑</button>
+    </div>
+    <div class="tools"><span style="font-size:12px;color:var(--muted)">피부색</span>${SKINS.map(c => `<button class="skin" data-k="${c}" style="background:${c}" aria-label="피부색"></button>`).join('')}</div>
+    <button class="btn" id="finish">다 그렸어요! ✨</button>
+    <div class="hint">그리는 동안 대형 화면에 랜덤으로 내 그림이 보여요</div>`;
+  base = document.getElementById('base'); ink = document.getElementById('ink');
+  bctx = base.getContext('2d'); ictx = ink.getContext('2d');
+  drawBase(); redraw(); syncTools();
+
+  document.querySelectorAll('.color').forEach(b => b.onclick = () => { tool.color = b.dataset.c; tool.eraser = false; syncTools(); });
+  document.querySelectorAll('.size').forEach(b => b.onclick = () => { tool.size = +b.dataset.s; syncTools(); });
+  document.querySelectorAll('.skin').forEach(b => b.onclick = () => { tool.skin = b.dataset.k; drawBase(); saveLocal(); dirty = true; schedulePush(); syncTools(); });
+  document.getElementById('eraser').onclick = () => { tool.eraser = !tool.eraser; syncTools(); };
+  document.getElementById('undo').onclick = () => { strokes.pop(); redraw(); saveLocal(); dirty = true; schedulePush(); };
+  document.getElementById('clear').onclick = () => { if (strokes.length && confirm('전부 지울까요?')) { strokes = []; redraw(); saveLocal(); dirty = true; schedulePush(); } };
+  document.getElementById('finish').onclick = openSubmit;
+
+  const pos = e => { const r = ink.getBoundingClientRect(); return [Math.round((e.clientX - r.left) / r.width * S), Math.round((e.clientY - r.top) / r.height * S)]; };
+  ink.onpointerdown = e => {
+    if (drawingNow) return;
+    ink.setPointerCapture(e.pointerId);
+    drawingNow = { c: tool.color, w: tool.size, e: tool.eraser ? 1 : 0, p: [pos(e)], id: e.pointerId };
+    drawStroke(ictx, drawingNow, true);
+  };
+  ink.onpointermove = e => {
+    if (!drawingNow || e.pointerId !== drawingNow.id) return;
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    for (const ev of evs) drawingNow.p.push(pos(ev));
+    const p = drawingNow.p; const n = p.length;
+    // incremental segment
+    segment(ictx, drawingNow, p[Math.max(0, n - evs.length - 1)], p.slice(Math.max(0, n - evs.length)));
+  };
+  const end = e => {
+    if (!drawingNow || e.pointerId !== drawingNow.id) return;
+    const { id, ...st } = drawingNow; strokes.push(st); drawingNow = null;
+    redraw(); saveLocal(); dirty = true; schedulePush();
+  };
+  ink.onpointerup = end; ink.onpointercancel = end;
+  pushTimer && clearInterval(pushTimer);
+  pushTimer = setInterval(() => { if (dirty && view === 'draw') pushLive(); }, 1500);
+  if (strokes.length) { dirty = true; pushLive(); }
+}
+function syncTools() {
+  document.querySelectorAll('.color').forEach(b => b.classList.toggle('on', !tool.eraser && b.dataset.c === tool.color));
+  document.querySelectorAll('.size').forEach(b => b.classList.toggle('on', +b.dataset.s === tool.size));
+  document.querySelectorAll('.skin').forEach(b => b.classList.toggle('on', b.dataset.k === tool.skin));
+  document.getElementById('eraser').classList.toggle('on', tool.eraser);
+}
+function drawBase(ctx = bctx, size = S) {
+  ctx.clearRect(0, 0, size, size);
+  ctx.fillStyle = tool.skin;
+  ctx.beginPath(); ctx.arc(size / 2, size * 0.53, size * 0.4, 0, Math.PI * 2); ctx.fill();
+  if (ctx === bctx) { // faint guide (not exported)
+    ctx.strokeStyle = 'rgba(0,0,0,.06)'; ctx.lineWidth = 3; ctx.setLineDash([10, 12]);
+    ctx.beginPath(); ctx.moveTo(size / 2, size * 0.2); ctx.lineTo(size / 2, size * 0.9); ctx.moveTo(size * 0.18, size * 0.5); ctx.lineTo(size * 0.82, size * 0.5); ctx.stroke(); ctx.setLineDash([]);
+  }
+}
+function styleFor(ctx, st, scale = 1) {
+  ctx.globalCompositeOperation = st.e ? 'destination-out' : 'source-over';
+  ctx.strokeStyle = st.c; ctx.fillStyle = st.c; ctx.lineWidth = st.w * (st.e ? 2 : 1) * scale; ctx.lineCap = ctx.lineJoin = 'round';
+}
+function drawStroke(ctx, st, dot = false, scale = 1) {
+  styleFor(ctx, st, scale); const p = st.p;
+  if (p.length === 1) { ctx.beginPath(); ctx.arc(p[0][0] * scale, p[0][1] * scale, ctx.lineWidth / 2, 0, Math.PI * 2); ctx.fill(); }
+  else if (!dot) {
+    ctx.beginPath(); ctx.moveTo(p[0][0] * scale, p[0][1] * scale);
+    for (let i = 1; i < p.length - 1; i++) { const mx = (p[i][0] + p[i + 1][0]) / 2, my = (p[i][1] + p[i + 1][1]) / 2; ctx.quadraticCurveTo(p[i][0] * scale, p[i][1] * scale, mx * scale, my * scale); }
+    const l = p[p.length - 1]; ctx.lineTo(l[0] * scale, l[1] * scale); ctx.stroke();
+  }
+  ctx.globalCompositeOperation = 'source-over';
+}
+function segment(ctx, st, from, pts) {
+  styleFor(ctx, st); ctx.beginPath(); ctx.moveTo(from[0], from[1]);
+  pts.forEach(q => ctx.lineTo(q[0], q[1])); ctx.stroke(); ctx.globalCompositeOperation = 'source-over';
+}
+function redraw() { ictx.clearRect(0, 0, S, S); strokes.forEach(s => drawStroke(ictx, s)); }
+function saveLocal() { try { store.setItem(STROKE_KEY, JSON.stringify({ strokes, skin: tool.skin })); } catch {} }
+
+function exportPNG(size) {
+  const c = document.createElement('canvas'); c.width = c.height = size; const ctx = c.getContext('2d');
+  drawBase(ctx, size);
+  const l = document.createElement('canvas'); l.width = l.height = size; const lc = l.getContext('2d');
+  const k = size / S; strokes.forEach(s => drawStroke(lc, s, false, k));
+  ctx.drawImage(l, 0, 0);
+  return c.toDataURL('image/png');
+}
+function schedulePush() { if (Date.now() - lastPush > 1500) pushLive(); }
+function pushLive() {
+  if (!me() || view !== 'draw') return;
+  dirty = false; lastPush = Date.now();
+  db.set(`${R}/live/${pid}`, exportPNG(180));
+}
+
+/* ───────────── submit sheet ───────────── */
+function openSubmit() {
+  if (!strokes.length) { alert('먼저 얼굴을 그려주세요! ✏️'); return; }
+  const finalImg = exportPNG(400);
+  const div = document.createElement('div'); div.className = 'sheet';
+  div.innerHTML = `<div>
+    <div style="display:flex;gap:14px;align-items:center">
+      <div class="mini" style="width:110px;height:150px;flex:none"><div class="av" style="--s:84px">${avatarHTML({ name: me().name, img: finalImg })}</div></div>
+      <div><h2>아바타 포인트 한 줄!</h2><p class="sub" style="margin:0;font-size:14px">AI 심사위원이 이 설명도 참고해요</p></div>
+    </div>
+    <input class="field" id="point" maxlength="30" placeholder="예) 후드티 쓴 훈남, 안경이 포인트" style="margin-top:12px" value="${esc(me().point || '')}">
+    <div class="count"><span id="cnt">0</span>/30</div>
+    <div class="row"><button class="btn ghost" id="back">더 그릴래요</button><button class="btn" id="send">제출하기 🚀</button></div>
+  </div>`;
+  document.body.appendChild(div);
+  const inp = div.querySelector('#point'); const cnt = div.querySelector('#cnt');
+  const upd = () => cnt.textContent = inp.value.length; upd(); inp.oninput = upd;
+  setTimeout(() => inp.focus(), 50);
+  div.querySelector('#back').onclick = () => div.remove();
+  div.onclick = e => { if (e.target === div) div.remove(); };
+  div.querySelector('#send').onclick = async () => {
+    const point = inp.value.trim();
+    if (!point) { inp.focus(); inp.placeholder = '한 줄 설명을 꼭 적어주세요!'; return; }
+    div.querySelector('#send').disabled = true;
+    await db.update(`${R}/players/${pid}`, { drawing: finalImg, point, status: 'submitted', submittedAt: db.now() });
+    div.remove();
+  };
+}
+
+/* ───────────── done + likes ───────────── */
+function renderDone() {
+  const m = me();
+  app.innerHTML = `${header()}<div class="center" style="justify-content:flex-start">
+    <div class="mini bounce" style="margin-top:46px"><div class="av talk">${avatarHTML({ name: m.name, img: m.drawing })}</div></div>
+    <h1 style="margin-top:4px">제출 완료! 🎉</h1>
+    <p class="sub">대형 화면에서 내 아바타를 찾아보세요.</p>
+    <button class="btn ghost" id="redo" style="max-width:220px;padding:10px;font-size:15px">다시 그리기</button>
+    <div class="section">❤️ 마음에 드는 그림에 좋아요 <small style="color:var(--muted);font-weight:600">(최종 점수에 반영)</small></div>
+    <div class="gallery" id="gal"></div></div>`;
+  app.querySelector('.av-bubble').textContent = m.point || '';
+  document.getElementById('redo').onclick = () => db.update(`${R}/players/${pid}`, { status: 'drawing' });
+  renderGallery();
+}
+function renderGallery() {
+  const gal = document.getElementById('gal'); if (!gal) return;
+  const others = Object.entries(players).filter(([id, p]) => id !== pid && p.status === 'submitted' && p.drawing)
+    .sort((a, b) => (a[1].submittedAt || 0) - (b[1].submittedAt || 0));
+  if (!others.length) { gal.innerHTML = '<p class="sub" style="grid-column:1/-1;text-align:center;margin-top:10px">아직 제출한 사람이 없어요</p>'; return; }
+  const open = state.phase === 'drawing';
+  gal.innerHTML = others.map(([id, p]) => {
+    const liked = !!(p.likes && p.likes[pid]); const n = p.likes ? Object.keys(p.likes).length : 0;
+    return `<div class="gcard"><img src="${p.drawing}" alt=""><div class="nm">${esc(p.name)}</div><div class="pt">${esc(p.point)}</div>
+      <button class="heart ${liked ? 'on' : ''}" data-id="${id}" ${open ? '' : 'disabled'}>${liked ? '❤️' : '🤍'} ${n}</button></div>`;
+  }).join('');
+  gal.querySelectorAll('.heart').forEach(b => b.onclick = () => {
+    const id = b.dataset.id; const liked = b.classList.contains('on');
+    db.set(`${R}/players/${id}/likes/${pid}`, liked ? null : true);
+  });
+}
+
+/* ───────────── judging / results ───────────── */
+function renderJudging() {
+  app.innerHTML = `${header()}<div class="center"><div class="spinner"></div><h1>AI 심사 중…</h1><p class="sub">AI 심사위원이 그림을 꼼꼼히 보고 있어요.<br>대형 화면을 봐주세요!</p></div>`;
+}
+const MEDAL = ['🥇', '🥈', '🥉'];
+function renderResults() {
+  const rk = results?.ranking || []; const rev = results?.revealed || 0;
+  let html = `${header()}<div class="center" style="justify-content:flex-start"><h1>🏆 결과 발표</h1>`;
+  if (!rev) html += '<p class="sub">곧 3위부터 발표해요! 두근두근…</p>';
+  const shown = [];
+  for (let i = 0; i < Math.min(rev, 3); i++) { const idx = 2 - i; if (rk[idx]) shown.unshift(idx); }
+  shown.forEach(i => { const r = rk[i]; html += `<div class="rank"><span class="medal">${MEDAL[i]}</span><img src="${players[r.id]?.drawing || ''}" alt=""><div><b>${esc(r.name)}</b><div style="font-size:13px;color:var(--muted)">「${esc(r.point)}」</div></div><b style="margin-left:auto">${results.mode === 'ai' ? r.final + '점' : '❤️ ' + r.likes}</b></div>`; });
+  if (rev >= 4) {
+    const i = rk.findIndex(r => r.id === pid);
+    if (i >= 0) {
+      const r = rk[i];
+      html += `<div class="mine"><div>내 순위</div><div class="big">${i + 1}위 <small style="font-size:16px">/ ${rk.length}명 · ${r.final}점</small></div>
+        ${r.ai ? `<div style="margin-top:8px;font-size:14px;opacity:.95">🤖 "${esc(r.ai.comment || '')}"</div>` : ''}
+        <div style="margin-top:6px;font-size:13px;opacity:.85">${r.ai ? `AI ${r.ai.total}점 · ` : ''}❤️ ${r.likes}</div></div>`;
+    }
+  }
+  html += '</div>';
+  app.innerHTML = html;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>얼굴 그리기 대회 · 진행자 화면</title>
+<link rel="stylesheet" href="shared.css">
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<style>
+  body { overflow: hidden; background: radial-gradient(1200px 700px at 50% 30%, #dff3ea, #bfe2d4); }
+  #stage { position: fixed; inset: 0; overflow: hidden; }
+  #top { position: fixed; top: 0; left: 0; right: 0; height: 74px; display: flex; align-items: center; gap: 16px; padding: 0 28px; z-index: 45; }
+  #top .title { font-weight: 900; font-size: 28px; letter-spacing: -.03em; background: #fff; padding: 6px 16px; border-radius: 12px; box-shadow: 0 3px 0 rgba(0,0,0,.08); }
+  #top .chip { background: rgba(255,255,255,.75); padding: 8px 14px; border-radius: 999px; font-weight: 700; font-size: 17px; }
+  #top .grow { flex: 1; }
+  #timer { font-variant-numeric: tabular-nums; font-weight: 900; font-size: 30px; background: #2b2f3a; color: var(--accent2); padding: 4px 16px; border-radius: 12px; }
+  #timer.over { background: var(--accent); color: #fff; animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: .55; } }
+  .icon { border: 0; background: rgba(255,255,255,.8); width: 44px; height: 44px; border-radius: 12px; font-size: 22px; }
+
+  .card { background: #fff; border-radius: 28px; box-shadow: 0 20px 60px rgba(30,60,50,.18); }
+  #lobby { position: fixed; left: 50%; top: 52%; transform: translate(-50%, -50%); z-index: 15; padding: 34px 44px; display: flex; gap: 40px; align-items: center; }
+  #lobby h1 { font-size: 46px; margin: 0 0 8px; letter-spacing: -.04em; line-height: 1.15; }
+  #lobby h1 em { font-style: normal; background: linear-gradient(transparent 60%, var(--accent2) 60%); }
+  #lobby .steps { font-size: 20px; color: #444; line-height: 1.8; margin: 14px 0 20px; }
+  #lobby .steps b { color: var(--purple); }
+  .qrbox { background: #fff; padding: 12px; border-radius: 18px; border: 3px solid #2b2f3a; }
+  .qrbox img, .qrbox canvas { display: block; image-rendering: pixelated; }
+  .url { font-size: 14px; color: var(--muted); word-break: break-all; margin-top: 8px; max-width: 320px; text-align: center; }
+  .url a { color: var(--purple); }
+  .big-btn { border: 0; background: var(--accent); color: #fff; font-size: 24px; font-weight: 900; padding: 16px 32px; border-radius: 18px; box-shadow: 0 5px 0 #c9372d; }
+  .big-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #c9372d; }
+  .big-btn.dark { background: #2b2f3a; box-shadow: 0 5px 0 #000; }
+  .count { font-size: 22px; font-weight: 800; }
+  .count b { color: var(--accent); font-size: 30px; }
+
+  #qrMini { position: fixed; left: 24px; bottom: 24px; z-index: 15; padding: 14px; display: flex; gap: 14px; align-items: center; border-radius: 20px; }
+  #qrMini .t { font-weight: 800; font-size: 18px; line-height: 1.4; }
+
+  #spot { position: fixed; right: 28px; top: 92px; z-index: 14; padding: 18px 20px 16px; width: 330px; text-align: center; transition: opacity .3s; }
+  #spot .lbl { font-weight: 800; color: var(--accent); font-size: 16px; }
+  #spot .img { width: 270px; height: 270px; margin: 6px auto; position: relative; }
+  #spot .img img { width: 100%; height: 100%; position: absolute; inset: 0; animation: pop .45s cubic-bezier(.3,1.6,.6,1); }
+  @keyframes pop { from { transform: scale(.6); opacity: 0; } }
+  #spot .nm { font-size: 26px; font-weight: 900; }
+
+  #controls { position: fixed; right: 24px; bottom: 24px; z-index: 50; display: flex; gap: 12px; align-items: center; }
+
+  .overlay { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; background: rgba(42,38,80,.82); color: #fff; }
+  #judging .box { text-align: center; }
+  #judging h2 { font-size: 54px; margin: 18px 0 8px; }
+  #judging p { font-size: 22px; opacity: .85; }
+  .robot { font-size: 110px; animation: think 1.2s ease-in-out infinite; display: inline-block; }
+  @keyframes think { 50% { transform: rotate(-8deg) translateY(-10px); } }
+  .scan { display: flex; gap: 10px; justify-content: center; margin-top: 26px; flex-wrap: wrap; max-width: 900px; }
+  .scan img { width: 70px; height: 70px; background: rgba(255,255,255,.12); border-radius: 14px; animation: scan 1.6s ease-in-out infinite; }
+  @keyframes scan { 50% { transform: translateY(-10px); background: rgba(198,242,78,.35); } }
+  .err { background: #fff; color: var(--ink); border-radius: 18px; padding: 18px 22px; margin-top: 20px; font-size: 18px; text-align: left; max-width: 760px; }
+  .err .btns { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  .sbtn { border: 0; border-radius: 12px; padding: 12px 18px; font-weight: 800; font-size: 16px; background: #eceaf6; color: var(--ink); }
+  .sbtn.pri { background: var(--purple); color: #fff; }
+
+  #reveal { background: radial-gradient(circle at 50% 30%, #5f5aa8, #2c2a55); }
+  .rv { display: flex; flex-direction: column; align-items: center; width: min(1300px, 94vw); }
+  .rv .judge { letter-spacing: .3em; font-weight: 900; color: #c8c6ff; font-size: 22px; }
+  .rv .rk { font-size: 92px; font-weight: 900; margin: 0 0 18px; text-shadow: 0 6px 0 rgba(0,0,0,.25); }
+  .rv .row { display: flex; gap: 48px; align-items: center; width: 100%; justify-content: center; }
+  .rv .pic { width: 480px; height: 520px; background: #d6efe5; border-radius: 24px; position: relative; flex: none; display: flex; align-items: center; justify-content: center; animation: pop .6s cubic-bezier(.3,1.5,.6,1); }
+  .rv .pic .av { position: relative; --s: 300px; }
+  .rv .info { flex: 1; max-width: 560px; }
+  .rv .nm { display: flex; align-items: center; gap: 16px; font-size: 64px; font-weight: 900; }
+  .medal { width: 84px; height: 84px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 42px; font-weight: 900; color: #5a3d00; background: radial-gradient(circle at 35% 30%, #ffe9a6, #e3a92c); box-shadow: 0 4px 0 rgba(0,0,0,.25); flex: none; }
+  .medal.m2 { background: radial-gradient(circle at 35% 30%, #fff, #b7bcc7); color: #3d4250; }
+  .medal.m3 { background: radial-gradient(circle at 35% 30%, #ffd8b0, #c77b3a); color: #4a2600; }
+  .rv .pt { font-size: 30px; font-weight: 800; color: #ffe27a; margin: 10px 0 24px; }
+  .bar { display: grid; grid-template-columns: 90px 1fr 56px; gap: 14px; align-items: center; font-size: 22px; font-weight: 800; margin: 10px 0; }
+  .bar .tr { height: 18px; background: rgba(255,255,255,.15); border-radius: 99px; overflow: hidden; }
+  .bar .fl { height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, #8f7cff, #6be0ff); transition: width 1.2s cubic-bezier(.2,.8,.2,1); }
+  .bar .v { text-align: right; font-variant-numeric: tabular-nums; }
+  .cmt { margin-top: 20px; font-size: 24px; line-height: 1.45; background: rgba(255,255,255,.1); border-radius: 16px; padding: 14px 18px; }
+  .final { margin-top: 20px; display: flex; align-items: baseline; gap: 14px; font-size: 22px; font-weight: 800; color: #d8d6ff; }
+  .final b { font-size: 64px; color: var(--accent2); }
+
+  .board { width: min(1500px, 96vw); text-align: center; }
+  .board h2 { font-size: 60px; margin: 0 0 10px; }
+  .podium { display: flex; justify-content: center; align-items: flex-end; gap: 30px; }
+  .pod { display: flex; flex-direction: column; align-items: center; }
+  .pod .av { position: relative; --s: 170px; }
+  .pod .stand { margin-top: 8px; width: 240px; border-radius: 16px 16px 0 0; background: rgba(255,255,255,.14); font-weight: 900; font-size: 48px; padding-top: 14px; }
+  .pod .stand small { display: block; font-size: 20px; color: #ffe27a; }
+  .pod.p1 .av { --s: 220px; }
+  .rest { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 22px; }
+  .rest div { background: rgba(255,255,255,.12); border-radius: 14px; padding: 6px 12px 6px 6px; display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 700; }
+  .rest img { width: 46px; height: 46px; }
+
+  #settings { z-index: 55; }
+  #settings .card { color: var(--ink); width: min(620px, 92vw); max-height: 90vh; overflow: auto; padding: 26px 30px; }
+  #settings h3 { margin: 0 0 16px; font-size: 24px; }
+  #settings label { display: block; font-weight: 800; margin: 14px 0 6px; font-size: 15px; }
+  #settings label small { font-weight: 500; color: var(--muted); }
+  #settings input { width: 100%; padding: 11px 13px; border: 2px solid #e2e0ee; border-radius: 12px; font-size: 16px; }
+  #settings .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+  #settings .btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+  #settings hr { border: 0; border-top: 1px solid #eee; margin: 20px 0 6px; }
+  .demo-banner { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: #fff3c4; color: #7a5f00; font-weight: 700; padding: 6px 14px; border-radius: 10px; z-index: 25; font-size: 14px; }
+  #confetti { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
+  .toast { position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%); background: #2b2f3a; color: #fff; padding: 12px 20px; border-radius: 12px; font-weight: 700; z-index: 70; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="top">
+  <div class="title">🎨 얼굴 그리기 대회</div>
+  <div class="chip" id="themeChip"></div>
+  <div class="grow"></div>
+  <div class="chip" id="countChip"></div>
+  <div id="timer" class="hidden"></div>
+  <button class="icon" id="gear" title="설정">⚙️</button>
+</div>
+
+<div id="lobby" class="card hidden">
+  <div>
+    <h1>QR 찍고<br><em>내 얼굴</em> 그리기!</h1>
+    <div class="steps">① 휴대폰 카메라로 QR 스캔<br>② 이름 입력 → <b>몸통 이름표</b>로!<br>③ 얼굴 그리고 <b>포인트 한 줄</b> 제출<br>④ <b>AI 심사위원</b>이 1·2·3등 발표</div>
+    <div class="count">참가 <b id="lobbyCount">0</b>명</div>
+    <div style="margin-top:18px;display:flex;gap:12px;align-items:center">
+      <button class="big-btn" id="startBtn">그리기 시작 ▶</button>
+      <span style="color:var(--muted);font-weight:700" id="timerInfo"></span>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:center">
+    <div class="qrbox" id="qrBig"></div>
+    <div class="url" id="urlBig"></div>
+  </div>
+</div>
+
+<div id="qrMini" class="card hidden"><div class="qrbox" id="qrSmall" style="padding:6px;border-width:2px"></div><div class="t">아직 안 들어왔다면<br>QR 찍고 참여! 📱</div></div>
+
+<div id="spot" class="card hidden"><div class="lbl">✏️ 지금 그리는 중…</div><div class="img" id="spotImg"></div><div class="nm" id="spotName"></div></div>
+
+<div id="controls"></div>
+
+<div id="judging" class="overlay hidden"><div class="box">
+  <span class="robot">🤖</span><h2>AI 심사 중…</h2><p id="judgeMsg">주제 · 창의성 · 표현력 · 완성도를 보고 있어요</p>
+  <div class="scan" id="scan"></div><div id="judgeErr"></div>
+</div></div>
+
+<div id="reveal" class="overlay hidden"></div>
+
+<div id="settings" class="overlay hidden"><div class="card">
+  <h3>⚙️ 설정</h3>
+  <label>주제 <small>(참가자 화면에도 표시돼요)</small></label>
+  <input id="sTheme" maxlength="40">
+  <div class="grid">
+    <div><label>그리기 시간(분) <small>0 = 타이머 없음</small></label><input id="sMinutes" type="number" min="0" max="60"></div>
+    <div><label>AI 점수 비중(%) <small>나머지는 좋아요</small></label><input id="sWeight" type="number" min="0" max="100"></div>
+  </div>
+  <label>Gemini API 키 <small>(이 컴퓨터 브라우저에만 저장돼요)</small></label>
+  <input id="sKey" type="password" placeholder="AIza..." autocomplete="off">
+  <label>Gemini 모델 <small>(auto = 사용 가능한 최신 Flash 모델 자동 선택)</small></label>
+  <input id="sModel">
+  <div class="btns"><button class="sbtn pri" id="sSave">저장</button><button class="sbtn" id="sTest">API 키 테스트</button><button class="sbtn" id="sClose">닫기</button></div>
+  <hr>
+  <label>리허설 / 관리</label>
+  <div class="btns">
+    <button class="sbtn" id="sBots">🧪 테스트 참가자 5명 추가</button>
+    <button class="sbtn" id="sReset">🔄 게임 초기화 (같은 QR)</button>
+    <button class="sbtn" id="sNewRoom">🆕 새 방 코드</button>
+  </div>
+  <div style="margin-top:12px;color:var(--muted);font-size:13px" id="sInfo"></div>
+</div></div>
+
+<canvas id="confetti"></canvas>
+
+<script type="module">
+import { initDB, DEMO, params, uid, esc, roomPath, avatarHTML, DEFAULT_THEME, botFace, BOT_NAMES, BOT_POINTS } from './shared.js';
+
+/* ───────────── room & settings ───────────── */
+const genCode = () => Array.from({ length: 4 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
+let room = (params.get('room') || localStorage.getItem('facegame-host-room') || genCode()).toUpperCase();
+localStorage.setItem('facegame-host-room', room);
+{ const u = new URL(location.href); u.searchParams.set('room', room); history.replaceState(null, '', u); }
+const R = roomPath(room);
+const cfg = {
+  get key() { return localStorage.getItem('facegame-gemini-key') || ''; },
+  get model() { return localStorage.getItem('facegame-gemini-model') || 'auto'; },
+  get minutes() { const v = localStorage.getItem('facegame-minutes'); return v === null ? 5 : +v; },
+  get weight() { const v = localStorage.getItem('facegame-weight'); return v === null ? 70 : +v; },
+};
+const joinURL = () => { const u = new URL('index.html', location.href); u.search = ''; u.searchParams.set('room', room); if (params.has('demo')) u.searchParams.set('demo', '1'); return u.toString(); };
+
+let db, state = {}, players = {}, results = null, live = {};
+const $ = id => document.getElementById(id);
+const toast = (msg, ms = 2500) => { const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), ms); };
+
+if (DEMO) { const b = document.createElement('div'); b.className = 'demo-banner'; b.textContent = '데모 모드: Firebase 설정 전이라 같은 브라우저의 탭끼리만 연결돼요'; document.body.appendChild(b); }
+
+/* ───────────── QR ───────────── */
+function drawQR(el, text, px) {
+  el.innerHTML = '';
+  if (!window.qrcode) { el.innerHTML = `<div style="width:${px}px;height:${px}px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:13px;color:#888">QR 라이브러리를<br>불러오지 못했어요<br>(인터넷 확인)</div>`; return; }
+  const q = qrcode(0, 'M'); q.addData(text); q.make();
+  const n = q.getModuleCount(); const cell = Math.max(2, Math.floor(px / n));
+  const c = document.createElement('canvas'); c.width = c.height = n * cell; const g = c.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.fillStyle = '#111';
+  for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (q.isDark(r, k)) g.fillRect(k * cell, r * cell, cell, cell);
+  c.style.width = c.style.height = px + 'px'; el.appendChild(c);
+}
+function paintQRs() {
+  const url = joinURL();
+  drawQR($('qrBig'), url, 300); drawQR($('qrSmall'), url, 120);
+  $('urlBig').innerHTML = `<a href="${esc(url)}" target="_blank">${esc(url)}</a><br>방 코드 <b style="color:var(--ink);font-size:18px">${room}</b>`;
+}
+
+/* ───────────── boot ───────────── */
+(async () => {
+  db = await initDB();
+  const s = await db.get(`${R}/state`);
+  if (!s) await db.set(`${R}/state`, { phase: 'lobby', theme: DEFAULT_THEME, createdAt: db.now() });
+  db.on(`${R}/state`, v => { state = v || {}; onState(); });
+  db.on(`${R}/players`, v => { players = v || {}; onPlayers(); });
+  db.on(`${R}/live`, v => { live = v || {}; onPlayers(); });
+  db.on(`${R}/results`, v => { results = v; if (state.phase === 'results') renderReveal(); });
+  paintQRs(); requestAnimationFrame(loop);
+  setInterval(tickTimer, 250); setInterval(rotateSpot, 3500); setInterval(randomTalk, 2200);
+})().catch(e => { document.body.insertAdjacentHTML('beforeend', `<div class="overlay"><div class="err">Firebase 연결에 실패했어요: ${esc(e.message)}<br>firebase-config.js 값과 Realtime Database 규칙을 확인해 주세요.</div></div>`); });
+
+/* ───────────── state rendering ───────────── */
+let lastPhase = null;
+function onState() {
+  const ph = state.phase || 'lobby';
+  if (ph !== lastPhase) onPlayers();
+  $('themeChip').textContent = '주제 · ' + (state.theme || DEFAULT_THEME);
+  $('lobby').classList.toggle('hidden', ph !== 'lobby');
+  $('qrMini').classList.toggle('hidden', ph !== 'drawing');
+  $('judging').classList.toggle('hidden', ph !== 'judging');
+  $('reveal').classList.toggle('hidden', ph !== 'results');
+  $('timer').classList.toggle('hidden', !(ph === 'drawing' && state.endsAt));
+  $('timerInfo').textContent = cfg.minutes ? `제한시간 ${cfg.minutes}분` : '타이머 없음';
+  if (ph !== 'drawing') $('spot').classList.add('hidden');
+  if (ph === 'judging') { paintScan(); if (lastPhase !== 'judging' && !judgingRunning) showJudgeRecover(); }
+  if (ph === 'results') renderReveal();
+  renderControls();
+  lastPhase = ph;
+}
+function renderControls() {
+  const ph = state.phase || 'lobby'; const c = $('controls');
+  if (ph === 'drawing') c.innerHTML = `<button class="big-btn dark" id="closeBtn">마감 & AI 심사 🤖</button>`;
+  else if (ph === 'results') {
+    const rev = results?.revealed || 0;
+    c.innerHTML = rev < 4 ? `<button class="big-btn" id="nextBtn">${['3위 발표', '2위 발표', '1위 발표!', '전체 순위'][rev]} ▶</button>` : `<button class="big-btn dark" id="againBtn">새 게임 🔄</button>`;
+  } else c.innerHTML = '';
+  $('closeBtn') && ($('closeBtn').onclick = closeAndJudge);
+  $('nextBtn') && ($('nextBtn').onclick = nextReveal);
+  $('againBtn') && ($('againBtn').onclick = resetGame);
+}
+$('startBtn').onclick = async () => {
+  const m = cfg.minutes;
+  await db.update(`${R}/state`, { phase: 'drawing', startedAt: db.now(), endsAt: m ? db.now() + m * 60000 : null });
+};
+function tickTimer() {
+  if (state.phase !== 'drawing' || !state.endsAt) return;
+  const left = Math.max(0, state.endsAt - db.now()); const t = $('timer');
+  const s = Math.ceil(left / 1000);
+  t.textContent = left > 0 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : '시간 종료!';
+  t.classList.toggle('over', left <= 0 || s <= 10);
+}
+document.addEventListener('keydown', e => {
+  if ((e.key === ' ' || e.key === 'ArrowRight') && state.phase === 'results' && (results?.revealed || 0) < 4 && $('settings').classList.contains('hidden')) { e.preventDefault(); nextReveal(); }
+});
+
+/* ───────────── players & bouncing avatars ───────────── */
+const bodies = new Map(); // pid -> body
+let headSize = 130;
+function list() { return Object.entries(players).map(([id, p]) => ({ id, ...p })); }
+function onPlayers() {
+  const all = list(); const sub = all.filter(p => p.status === 'submitted').length;
+  $('countChip').textContent = `참가 ${all.length} · 제출 ${sub}`;
+  $('lobbyCount').textContent = all.length;
+  // size by crowd
+  const W = innerWidth, H = innerHeight - 80; const n = Math.max(all.length, 4);
+  headSize = Math.max(70, Math.min(170, Math.sqrt(W * H / (n * 7))));
+  const stage = $('stage');
+  for (const p of all) {
+    let b = bodies.get(p.id);
+    const img = p.status === 'submitted' ? p.drawing : live[p.id] || '';
+    const key = `${p.name}|${p.status}|${img ? 1 : 0}|${state.phase}`;
+    let isNew = false;
+    if (!b) {
+      const el = document.createElement('div'); el.className = 'av'; stage.appendChild(el);
+      b = { el, x: Math.random() * (W - headSize), y: 80 + Math.random() * H * 0.3, vx: (Math.random() < .5 ? -1 : 1) * (60 + Math.random() * 120), vy: 0, key: '', img: '' };
+      bodies.set(p.id, b); isNew = true;
+    }
+    if (b.key !== key) {
+      const wasSubmitted = b.key.includes('|submitted|');
+      b.el.innerHTML = avatarHTML({ name: p.name, img, drawing: p.status !== 'submitted' && state.phase === 'drawing' });
+      b.key = key; b.img = img;
+      if (p.status === 'submitted' && !wasSubmitted && !isNew) talk(b, p.point, 4500, true);
+    } else if (img && b.img !== img) { const im = b.el.querySelector('.av-head img'); if (im) im.src = img; b.img = img; }
+    b.point = p.point; b.status = p.status;
+    b.el.style.setProperty('--s', headSize + 'px');
+  }
+  for (const [id, b] of bodies) if (!players[id]) { b.el.remove(); bodies.delete(id); }
+  if (state.phase === 'judging') paintScan();
+}
+function talk(b, text, ms = 3800, force = false) {
+  if (!text) return;
+  const talking = [...bodies.values()].filter(x => x.el.classList.contains('talk')).length;
+  if (!force && talking >= 3) return;
+  b.el.querySelector('.av-bubble').textContent = text;
+  b.el.classList.add('talk'); clearTimeout(b.talkT);
+  b.talkT = setTimeout(() => b.el.classList.remove('talk'), ms);
+}
+function randomTalk() {
+  if (!['drawing', 'lobby'].includes(state.phase)) return;
+  const c = [...bodies.values()].filter(b => b.status === 'submitted' && b.point && !b.el.classList.contains('talk'));
+  if (c.length) { const b = c[Math.floor(Math.random() * c.length)]; talk(b, b.point); }
+}
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.033, (now - last) / 1000); last = now;
+  const W = innerWidth, H = innerHeight; const top = 80;
+  const g = 1500 * (H / 1000);
+  const arr = [...bodies.values()];
+  for (const b of arr) {
+    const w = headSize * 1.05, h = headSize * 1.5;
+    b.w = w; b.h = h;
+    b.vy += g * dt; b.x += b.vx * dt; b.y += b.vy * dt;
+    if (b.y + h > H) {
+      b.y = H - h;
+      const hop = (0.18 + Math.random() * 0.42) * (H - top - h);
+      b.vy = -Math.sqrt(2 * g * Math.max(hop, 40));
+      b.vx += (Math.random() - 0.5) * 80; b.vx = Math.max(-240, Math.min(240, b.vx));
+      if (Math.abs(b.vx) < 40) b.vx = (b.vx < 0 ? -1 : 1) * 60;
+      b.squash = 1;
+    }
+    if (b.y < top) { b.y = top; b.vy = Math.abs(b.vy) * 0.5; }
+    if (b.x < 0) { b.x = 0; b.vx = Math.abs(b.vx); }
+    if (b.x + w > W) { b.x = W - w; b.vx = -Math.abs(b.vx); }
+  }
+  // soft separation
+  for (let i = 0; i < arr.length; i++) for (let j = i + 1; j < arr.length; j++) {
+    const a = arr[i], c = arr[j];
+    const dx = (c.x + c.w / 2) - (a.x + a.w / 2), dy = (c.y + c.h / 2) - (a.y + a.h / 2);
+    const minX = (a.w + c.w) / 2 * 0.8, minY = (a.h + c.h) / 2 * 0.8;
+    if (Math.abs(dx) < minX && Math.abs(dy) < minY) {
+      const push = (minX - Math.abs(dx)) / 2 * (dx < 0 ? -1 : 1) * 0.3;
+      a.x -= push; c.x += push;
+      if ((c.vx - a.vx) * dx < 0) { const t = a.vx; a.vx = c.vx; c.vx = t; }
+    }
+  }
+  for (const b of arr) {
+    const sq = b.squash ? 1 - b.squash * 0.12 : 1; if (b.squash) b.squash = Math.max(0, b.squash - dt * 6);
+    b.el.style.transform = `translate(${b.x}px, ${b.y}px) rotate(${b.vx * 0.03}deg) scale(${2 - sq}, ${sq})`;
+    b.el.style.transformOrigin = '50% 100%';
+  }
+  requestAnimationFrame(loop);
+}
+
+/* ───────────── spotlight (random drawing-in-progress) ───────────── */
+let spotId = null;
+function rotateSpot() {
+  const spot = $('spot');
+  if (state.phase !== 'drawing') { spot.classList.add('hidden'); return; }
+  const c = list().filter(p => p.status !== 'submitted' && live[p.id]);
+  if (!c.length) { spot.classList.add('hidden'); return; }
+  let pick = c[Math.floor(Math.random() * c.length)];
+  if (c.length > 1 && pick.id === spotId) pick = c.find(p => p.id !== spotId);
+  spotId = pick.id;
+  $('spotImg').innerHTML = `<img src="${live[pick.id]}" alt="">`;
+  $('spotName').textContent = pick.name;
+  spot.classList.remove('hidden');
+}
+// keep the spotlight image fresh while the same person draws
+setInterval(() => { if (!spotId || state.phase !== 'drawing') return; const lv = live[spotId]; const im = $('spotImg').querySelector('img'); if (lv && im && im.src !== lv) { im.style.animation = 'none'; im.src = lv; } }, 1000);
+
+/* ───────────── judging ───────────── */
+let judgingRunning = false;
+function paintScan() {
+  $('scan').innerHTML = list().filter(p => p.status === 'submitted' && p.drawing).map((p, i) => `<img src="${p.drawing}" style="animation-delay:${(i % 10) * 0.12}s" alt="">`).join('');
+}
+async function closeAndJudge() {
+  const all = list(); const sub = all.filter(p => p.status === 'submitted' && p.drawing);
+  if (!sub.length) { toast('아직 제출한 사람이 없어요!'); return; }
+  const miss = all.length - sub.length;
+  if (miss && !confirm(`아직 제출하지 않은 ${miss}명은 심사에서 빠져요. 마감할까요?`)) return;
+  await db.update(`${R}/state`, { phase: 'judging', closedAt: db.now() });
+  runJudge();
+}
+function showJudgeRecover() {
+  // Host page reloaded while phase was "judging" → offer to rerun
+  $('judgeErr').innerHTML = `<div class="err">심사가 진행 중이던 상태예요.<div class="btns"><button class="sbtn pri" id="jRetry">AI 심사 시작</button><button class="sbtn" id="jBack">그리기로 돌아가기</button></div></div>`;
+  $('jRetry').onclick = runJudge; $('jBack').onclick = backToDrawing;
+}
+async function backToDrawing() { $('judgeErr').innerHTML = ''; await db.update(`${R}/state`, { phase: 'drawing' }); }
+
+async function runJudge() {
+  if (judgingRunning) return; judgingRunning = true;
+  $('judgeErr').innerHTML = ''; $('judgeMsg').textContent = '주제 · 창의성 · 표현력 · 완성도를 보고 있어요';
+  const sub = list().filter(p => p.status === 'submitted' && p.drawing).sort((a, b) => (a.submittedAt || 0) - (b.submittedAt || 0));
+  try {
+    if (!cfg.key) throw new Error('Gemini API 키가 아직 설정되지 않았어요. ⚙️ 설정에서 입력해 주세요.');
+    const t0 = Date.now();
+    let scores;
+    try { scores = await geminiJudge(sub); }
+    catch (e) { $('judgeMsg').textContent = '한 번 더 물어보는 중…'; await new Promise(r => setTimeout(r, 2500)); scores = await geminiJudge(sub); }
+    const wait = 3500 - (Date.now() - t0); if (wait > 0) await new Promise(r => setTimeout(r, wait)); // keep the suspense
+    await publishResults(sub, scores, 'ai');
+  } catch (e) {
+    console.error(e);
+    $('judgeErr').innerHTML = `<div class="err">⚠️ AI 심사에 실패했어요<br><small style="color:#888">${esc(e.message).slice(0, 300)}</small>
+      <div class="btns"><button class="sbtn pri" id="jRetry">다시 시도</button><button class="sbtn" id="jLikes">좋아요 수로만 순위 정하기</button><button class="sbtn" id="jSet">⚙️ 설정 열기</button><button class="sbtn" id="jBack">그리기로 돌아가기</button></div></div>`;
+    $('jRetry').onclick = runJudge; $('jLikes').onclick = () => publishResults(sub, null, 'likes');
+    $('jSet').onclick = openSettings; $('jBack').onclick = backToDrawing;
+  } finally { judgingRunning = false; }
+}
+
+let resolvedModel = null;
+async function resolveModel(force = false) {
+  if (cfg.model !== 'auto' && !force) return cfg.model;
+  if (resolvedModel && !force) return resolvedModel;
+  const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', { headers: { 'x-goog-api-key': cfg.key } });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d?.error?.message || `HTTP ${r.status}`);
+  const ver = n => parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || 0);
+  const cands = (d.models || []).filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+    .map(m => m.name.replace('models/', ''))
+    .filter(n => /^gemini-.*flash/.test(n) && !/image|tts|audio|live|embed|thinking|computer/.test(n));
+  if (!cands.length) throw new Error('사용할 수 있는 Gemini Flash 모델을 찾지 못했어요');
+  const score = n => ver(n) * 100 - (/preview|exp/.test(n) ? 50 : 0) - (/lite/.test(n) ? 20 : 0) - (/-\d{3,}/.test(n) ? 5 : 0);
+  cands.sort((a, b) => score(b) - score(a));
+  resolvedModel = cands[0]; return resolvedModel;
+}
+async function callGemini(body) {
+  let model = await resolveModel();
+  const go = m => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': cfg.key }, body: JSON.stringify(body) });
+  let res = await go(model);
+  if (res.status === 404) { model = await resolveModel(true); res = await go(model); } // model retired → auto-pick
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error?.message || `HTTP ${res.status}`);
+  return { data, model };
+}
+
+async function geminiJudge(sub) {
+  const theme = state.theme || DEFAULT_THEME;
+  const prompt = `당신은 회사 워크샵 "얼굴 그리기 대회"의 유쾌하고 따뜻한 AI 심사위원입니다.
+대회 주제: "${theme}"
+참가자들은 휴대폰 화면에 손가락으로 아바타 얼굴을 그리고, 그림의 '포인트'를 한 줄로 적었습니다.
+아래에 참가자마다 [번호] id, 이름, 포인트 설명, 그리고 그림 이미지가 차례로 주어집니다.
+
+각 그림을 4개 항목으로 0~100점 채점하세요.
+- topic (주제): 대회 주제와 본인이 적은 포인트 설명이 그림에 잘 드러나는가
+- creativity (창의성): 아이디어와 재미, 독특함
+- expression (표현력): 표정, 특징, 색 사용 등 묘사력
+- completeness (완성도): 정성과 마무리
+
+규칙:
+- 손가락 그림이라는 점을 감안해 너무 짜게 주지 말되(대략 55~98점), 순위가 분명히 갈리도록 참가자끼리 점수 차이를 두고 총점 동점은 피하세요.
+- comment: 그림에 대한 재치 있고 따뜻한 한 줄 평 (한국어, 40자 이내). 실제 사람의 외모를 비하하지 말고, 웃기되 기분 좋게.
+- 모든 참가자를 빠짐없이 채점하세요.
+- 반드시 아래 형식의 JSON 배열만 출력하세요.
+[{"id":"참가자id","topic":0,"creativity":0,"expression":0,"completeness":0,"comment":"한 줄 평"}]`;
+  const parts = [{ text: prompt }];
+  sub.forEach((p, i) => {
+    parts.push({ text: `[${i + 1}] id=${p.id} / 이름=${p.name} / 포인트="${p.point || ''}"` });
+    parts.push({ inline_data: { mime_type: 'image/png', data: p.drawing.split(',')[1] } });
+  });
+  const { data } = await callGemini({ contents: [{ role: 'user', parts }], generationConfig: { responseMimeType: 'application/json', temperature: 0.7 } });
+  const text = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+  const m = text.match(/\[[\s\S]*\]/); if (!m) throw new Error('AI 응답을 해석하지 못했어요: ' + text.slice(0, 120));
+  const arr = JSON.parse(m[0]); const out = {};
+  for (const r of arr) if (r && r.id) out[String(r.id).trim()] = r;
+  // tolerate id mismatch by order
+  sub.forEach((p, i) => { if (!out[p.id] && arr[i]) out[p.id] = arr[i]; });
+  const missing = sub.filter(p => !out[p.id]);
+  if (missing.length) throw new Error(`${missing.map(p => p.name).join(', ')} 님의 점수가 빠졌어요`);
+  return out;
+}
+
+async function publishResults(sub, scores, mode) {
+  const w = Math.max(0, Math.min(100, cfg.weight)) / 100;
+  const likeCount = p => (p.likes ? Object.keys(p.likes).length : 0);
+  const maxLikes = Math.max(0, ...sub.map(likeCount));
+  const clamp = v => Math.max(0, Math.min(100, Math.round(+v || 0)));
+  const ranking = sub.map(p => {
+    const likes = likeCount(p); let ai = null, final;
+    if (scores) {
+      const s = scores[p.id];
+      ai = { topic: clamp(s.topic), creativity: clamp(s.creativity), expression: clamp(s.expression), completeness: clamp(s.completeness), comment: String(s.comment || '').slice(0, 80) };
+      ai.total = Math.round((ai.topic + ai.creativity + ai.expression + ai.completeness) / 4 * 10) / 10;
+      final = maxLikes > 0 ? ai.total * w + (likes / maxLikes * 100) * (1 - w) : ai.total;
+    } else final = likes;
+    return { id: p.id, name: p.name, point: p.point || '', likes, ai, final: Math.round(final * 10) / 10, at: p.submittedAt || 0 };
+  }).sort((a, b) => b.final - a.final || (b.ai?.total || 0) - (a.ai?.total || 0) || b.likes - a.likes || a.at - b.at);
+  await db.set(`${R}/results`, { ranking, revealed: 0, mode, weight: Math.round(w * 100), maxLikes });
+  await db.update(`${R}/state`, { phase: 'results' });
+  $('judgeErr').innerHTML = '';
+}
+
+/* ───────────── reveal ───────────── */
+let lastRevealKey = '';
+async function nextReveal() {
+  const rev = (results?.revealed || 0) + 1;
+  const n = results?.ranking?.length || 0;
+  let next = rev;
+  // skip ranks that don't exist (fewer than 3 participants)
+  while (next <= 3 && !results.ranking[3 - next]) next++;
+  await db.update(`${R}/results`, { revealed: Math.min(4, next) });
+}
+function renderReveal() {
+  const el = $('reveal'); renderControls();
+  if (!results) { el.innerHTML = ''; return; }
+  const rk = results.ranking || []; const rev = results.revealed || 0;
+  const key = rev + '|' + rk.length; if (key === lastRevealKey) return; lastRevealKey = key;
+  const imgOf = id => players[id]?.drawing || '';
+  const fmt = r => results.mode === 'ai' ? `${r.final}점` : `❤️ ${r.likes}`;
+  if (rev === 0) {
+    el.innerHTML = `<div class="rv"><div class="judge">AI JUDGE · 결과 발표</div><div class="rk" style="font-size:80px;margin-top:20px">두구두구… 🥁</div><div style="font-size:26px;opacity:.85">${rk.length}명의 작품 심사 완료! 3위부터 공개합니다</div></div>`;
+    return;
+  }
+  if (rev <= 3) {
+    const idx = 3 - rev; const r = rk[idx]; if (!r) return;
+    const label = results.mode === 'ai' ? `최종 (AI ${results.weight}% + 좋아요 ${100 - results.weight}%)` : '최종 (좋아요 수)';
+    const bars = r.ai ? [['주제', r.ai.topic], ['창의성', r.ai.creativity], ['표현력', r.ai.expression], ['완성도', r.ai.completeness]]
+      .map(([k, v]) => `<div class="bar"><span>${k}</span><div class="tr"><div class="fl" data-w="${v}"></div></div><span class="v">${v}</span></div>`).join('') : '';
+    el.innerHTML = `<div class="rv"><div class="judge">AI JUDGE · 얼굴 그리기 대회</div><div class="rk">${idx + 1}위</div>
+      <div class="row"><div class="pic"><div class="av">${avatarHTML({ name: r.name, img: imgOf(r.id) })}</div></div>
+      <div class="info"><div class="nm"><span class="medal m${idx + 1}">${idx + 1}</span>${esc(r.name)}</div>
+      <div class="pt">「${esc(r.point)}」</div>${bars}
+      ${r.ai?.comment ? `<div class="cmt">🤖 "${esc(r.ai.comment)}"</div>` : ''}
+      <div class="final">${label}<b>${r.final}</b><span>❤️ ${r.likes}</span></div></div></div></div>`;
+    setTimeout(() => el.querySelectorAll('.fl').forEach(f => f.style.width = f.dataset.w + '%'), 120);
+    if (idx === 0) confetti();
+    return;
+  }
+  const pod = [1, 0, 2].filter(i => rk[i]).map(i => `<div class="pod p${i + 1}"><div class="av">${avatarHTML({ name: rk[i].name, img: imgOf(rk[i].id) })}</div><div class="stand" style="height:${[200, 150, 110][i]}px">${['🥇', '🥈', '🥉'][i]}<small>${fmt(rk[i])}</small></div></div>`).join('');
+  const rest = rk.slice(3).map((r, i) => `<div><img src="${imgOf(r.id)}" alt="">${i + 4}위 ${esc(r.name)} · ${fmt(r)}</div>`).join('');
+  el.innerHTML = `<div class="board"><h2>🏆 최종 순위</h2><div class="podium">${pod}</div><div class="rest">${rest}</div></div>`;
+}
+
+/* ───────────── confetti ───────────── */
+function confetti() {
+  const c = $('confetti'); const g = c.getContext('2d'); c.width = innerWidth; c.height = innerHeight;
+  const cols = ['#ff5a4e', '#c6f24e', '#6be0ff', '#ffd23f', '#a06cf0', '#fff'];
+  const ps = Array.from({ length: 220 }, () => ({ x: Math.random() * c.width, y: -20 - Math.random() * c.height * 0.5, vx: (Math.random() - .5) * 4, vy: 2 + Math.random() * 4, r: Math.random() * 6, s: 6 + Math.random() * 8, c: cols[Math.floor(Math.random() * cols.length)], w: Math.random() * 0.2 }));
+  const t0 = performance.now();
+  (function f(t) {
+    g.clearRect(0, 0, c.width, c.height);
+    ps.forEach(p => { p.x += p.vx; p.y += p.vy; p.r += p.w; g.save(); g.translate(p.x, p.y); g.rotate(p.r); g.fillStyle = p.c; g.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); g.restore(); });
+    if (t - t0 < 6000) requestAnimationFrame(f); else g.clearRect(0, 0, c.width, c.height);
+  })(t0);
+}
+
+/* ───────────── settings ───────────── */
+function openSettings() {
+  $('sTheme').value = state.theme || DEFAULT_THEME; $('sMinutes').value = cfg.minutes; $('sWeight').value = cfg.weight;
+  $('sKey').value = cfg.key; $('sModel').value = cfg.model; $('sInfo').textContent = `방 코드 ${room} · ${DEMO ? '데모 모드' : 'Firebase 연결됨'}`;
+  $('settings').classList.remove('hidden');
+}
+$('gear').onclick = openSettings;
+$('sClose').onclick = () => $('settings').classList.add('hidden');
+$('sSave').onclick = async () => {
+  localStorage.setItem('facegame-minutes', Math.max(0, +$('sMinutes').value || 0));
+  localStorage.setItem('facegame-weight', Math.max(0, Math.min(100, +$('sWeight').value || 0)));
+  localStorage.setItem('facegame-gemini-key', $('sKey').value.trim());
+  localStorage.setItem('facegame-gemini-model', $('sModel').value.trim() || 'auto');
+  const theme = $('sTheme').value.trim() || DEFAULT_THEME;
+  if (theme !== state.theme) await db.update(`${R}/state`, { theme });
+  $('settings').classList.add('hidden'); toast('저장했어요'); onState();
+};
+$('sTest').onclick = async () => {
+  localStorage.setItem('facegame-gemini-key', $('sKey').value.trim());
+  localStorage.setItem('facegame-gemini-model', $('sModel').value.trim() || 'auto');
+  $('sInfo').textContent = '테스트 중…';
+  try {
+    const { data: d, model } = await callGemini({ contents: [{ parts: [{ text: '"준비 완료"라고만 답해줘' }] }] });
+    $('sInfo').textContent = `✅ 연결 성공 (${model}): ` + (d.candidates?.[0]?.content?.parts?.[0]?.text || '').trim().slice(0, 40);
+  } catch (e) { $('sInfo').textContent = '❌ 실패: ' + e.message; }
+};
+$('sBots').onclick = async () => {
+  const upd = {}, lv = {};
+  for (let i = 0; i < 5; i++) {
+    const id = 'bot' + uid(); const face = botFace(400); const done = Math.random() < 0.6;
+    const name = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)] + (Math.random() < .3 ? Math.floor(Math.random() * 9) : '');
+    lv[id] = botFace(180);
+    upd[id] = { name, status: done ? 'submitted' : 'drawing', joinedAt: db.now(), ...(done ? { drawing: face, point: BOT_POINTS[Math.floor(Math.random() * BOT_POINTS.length)], submittedAt: db.now() } : {}) };
+  }
+  await db.update(`${R}/players`, upd); await db.update(`${R}/live`, lv); toast('테스트 참가자 5명을 추가했어요');
+};
+async function resetGame() {
+  if (!confirm('참가자와 결과를 모두 지우고 처음부터 시작할까요?')) return;
+  await db.remove(`${R}/players`); await db.remove(`${R}/results`); await db.remove(`${R}/live`);
+  await db.set(`${R}/state`, { phase: 'lobby', theme: state.theme || DEFAULT_THEME, createdAt: db.now() });
+  lastRevealKey = ''; $('settings').classList.add('hidden');
+}
+$('sReset').onclick = resetGame;
+$('sNewRoom').onclick = () => {
+  if (!confirm('새 방 코드로 바꿀까요? (기존 QR은 더 이상 쓰이지 않아요)')) return;
+  localStorage.setItem('facegame-host-room', genCode());
+  const u = new URL(location.href); u.searchParams.delete('room'); location.href = u.toString();
+};
+addEventListener('resize', () => { onPlayers(); });
+</script>
+</body>
+</html>
