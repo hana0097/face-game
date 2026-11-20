@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <script>/* auto-update: if a newer version is deployed, reload past the browser cache */
-window.APP_V = '7';
+window.APP_V = '8';
 fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
   const m = t.match(/APP_V = '(\d+)'/);
   if (m && m[1] !== window.APP_V && new URL(location.href).searchParams.get('v') !== m[1]) { const u = new URL(location.href); u.searchParams.set('v', m[1]); location.replace(u); }
@@ -52,6 +52,11 @@ fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }).then(r 
   #spot .nm { font-size: 40px; font-weight: 900; }
 
   #controls { position: fixed; right: 24px; bottom: 24px; z-index: 50; display: flex; gap: 12px; align-items: center; }
+  #navchips { position: fixed; left: 24px; bottom: 24px; z-index: 50; }
+  .navchips { display: flex; gap: 6px; background: rgba(20,18,50,.55); padding: 7px; border-radius: 16px; backdrop-filter: blur(4px); }
+  .navchips button { border: 0; border-radius: 11px; padding: 10px 14px; font-weight: 800; font-size: 16px; background: rgba(255,255,255,.14); color: #fff; }
+  .navchips button:hover { background: rgba(255,255,255,.28); }
+  .navchips button.on { background: #fff; color: #2c2a55; }
 
   .overlay { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; background: rgba(42,38,80,.82); color: #fff; }
   #judging .box { text-align: center; }
@@ -173,6 +178,7 @@ fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }).then(r 
 
 <div id="spot" class="card hidden"><div class="lbl">✏️ 지금 그리는 중…</div><div class="img" id="spotImg"></div><div class="nm" id="spotName"></div></div>
 
+<div id="navchips"></div>
 <div id="controls"></div>
 
 <div id="judging" class="overlay hidden"><div class="box">
@@ -290,6 +296,19 @@ function renderControls() {
     c.innerHTML = (rev >= 4 ? `<button class="big-btn dark" id="saveBtn" style="font-size:18px;padding:12px 18px">📦 그림 저장</button>` : '')
       + (rev < maxReveal() ? `<button class="big-btn" id="nextBtn">${['3위 발표', '2위 발표', '1위 발표!', '전체 순위', '나머지 심사평 📝'][rev]} ▶</button>` : `<button class="big-btn dark" id="againBtn">새 게임 🔄</button>`);
   } else c.innerHTML = '';
+  // results navigation: ◀ back any time; jump chips once everything has been revealed
+  const nav = $('navchips');
+  if (ph === 'results' && results) {
+    const rev = results.revealed || 0, seen = Math.max(results.seen || 0, rev), rk = results.ranking || [], opts = [];
+    if (rev > 1) opts.push('<button data-go="prev">◀ 이전</button>');
+    if (seen >= 4) {
+      [3, 2, 1].forEach(k => { if (rk[k - 1]) opts.push(`<button data-go="${4 - k}" class="${rev === 4 - k ? 'on' : ''}">${['🥇', '🥈', '🥉'][k - 1]} ${k}위</button>`); });
+      opts.push(`<button data-go="4" class="${rev === 4 ? 'on' : ''}">🏆 전체 순위</button>`);
+      if (maxReveal() === 5) opts.push(`<button data-go="5" class="${rev === 5 ? 'on' : ''}">📝 나머지 심사평</button>`);
+    }
+    nav.innerHTML = opts.length ? `<div class="navchips">${opts.join('')}</div>` : '';
+    nav.querySelectorAll('button').forEach(b => b.onclick = () => (b.dataset.go === 'prev' ? prevReveal() : goReveal(+b.dataset.go)));
+  } else nav.innerHTML = '';
   $('closeBtn') && ($('closeBtn').onclick = closeAndJudge);
   $('nextBtn') && ($('nextBtn').onclick = nextReveal);
   $('againBtn') && ($('againBtn').onclick = resetGame);
@@ -308,6 +327,7 @@ function tickTimer() {
 }
 document.addEventListener('keydown', e => {
   if ((e.key === ' ' || e.key === 'ArrowRight') && state.phase === 'results' && (results?.revealed || 0) < maxReveal() && $('settings').classList.contains('hidden')) { e.preventDefault(); nextReveal(); }
+  if (e.key === 'ArrowLeft' && state.phase === 'results' && (results?.revealed || 0) > 1 && $('settings').classList.contains('hidden')) { e.preventDefault(); prevReveal(); }
 });
 
 /* ───────────── players & bouncing avatars ───────────── */
@@ -627,7 +647,15 @@ async function nextReveal() {
   let next = rev;
   // skip ranks that don't exist (fewer than 3 participants)
   while (next <= 3 && !results.ranking[3 - next]) next++;
-  await db.update(`${R}/results`, { revealed: Math.min(maxReveal(), next) });
+  await goReveal(Math.min(maxReveal(), next));
+}
+async function goReveal(v) {
+  await db.update(`${R}/results`, { revealed: v, seen: Math.max(results?.seen || 0, results?.revealed || 0, v) });
+}
+async function prevReveal() {
+  let v = (results?.revealed || 0) - 1;
+  while (v >= 1 && v <= 3 && !results.ranking[3 - v]) v--; // skip ranks that don't exist
+  await goReveal(Math.max(0, v));
 }
 function judgeRows(r) {
   const js = r.ai?.judges;
