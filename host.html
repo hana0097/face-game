@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <script>/* auto-update: if a newer version is deployed, reload past the browser cache */
-window.APP_V = '6';
+window.APP_V = '7';
 fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
   const m = t.match(/APP_V = '(\d+)'/);
   if (m && m[1] !== window.APP_V && new URL(location.href).searchParams.get('v') !== m[1]) { const u = new URL(location.href); u.searchParams.set('v', m[1]); location.replace(u); }
@@ -109,6 +109,10 @@ fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }).then(r 
   .rc-sc small { font-size: 14px; }
   .rc-sc span { display: block; font-size: 14px; color: #fff; }
   .rc-cm { font-size: 14px; line-height: 1.35; margin-top: 5px; opacity: .92; }
+  .rc-j { margin-top: 7px; background: rgba(0,0,0,.16); border-radius: 10px; padding: 5px 9px; }
+  .rc-jh { font-size: 13px; font-weight: 800; color: #c8c6ff; }
+  .rc-jh em { font-style: normal; color: var(--accent2); margin-left: 6px; }
+  .rc-jc { font-size: 14px; line-height: 1.35; }
   .board { width: min(1500px, 96vw); text-align: center; }
   .board h2 { font-size: 60px; margin: 0 0 10px; }
   .podium { display: flex; justify-content: center; align-items: flex-end; gap: 30px; }
@@ -517,6 +521,17 @@ const toJpeg = (src, size = 320) => new Promise(res => {
   im.src = src;
 });
 // Judge in groups of 5 so each request stays small
+const COMMON_RULES = `[전체 심사 공통 규칙]
+1. 모든 참가자에게 동일한 평가 기준과 엄격도를 적용합니다.
+2. 참가자의 이름, 직급, 친분, 소속, 평소 이미지 등에 영향을 받지 않고 그림만으로 평가합니다.
+3. 다른 참가자의 그림이나 점수를 참고하지 않고 독립적으로 평가합니다.
+4. 제시된 인물 표현 포인트는 반드시 평가에 반영하되, 해당 포인트가 그림에서 실제로 확인되는지를 기준으로 판단합니다.
+5. 그림 실력, 창의성, 표현력은 서로 다른 평가 요소이므로 하나의 장점이 다른 항목의 점수를 자동으로 높이지 않도록 합니다.
+6. 근거 없이 높은 점수나 낮은 점수를 부여하지 않습니다. 점수에는 반드시 구체적인 이유가 있어야 합니다.
+7. 모든 점수는 100점 만점 기준이며, 평가 기준에 따라 일관되게 부여합니다.
+8. 심사평은 재미있고 재치 있게 작성하되, 참가자를 비하하거나 외모를 조롱하지 않습니다.
+9. 그림에서 확인할 수 없는 특징은 추측하지 않습니다.
+10. 심사위원의 개성은 심사평에서 드러내되, 점수의 공정성과 객관성을 해치지 않습니다.`;
 const JUDGES = [
   { id: 'art', emoji: '🎨', name: '깐깐 아트디렉터', persona: '선, 색, 구도, 완성도를 꼼꼼히 보는 미술 전문가. 기준이 높고 칭찬은 짧고 정확하게 한다.' },
   { id: 'pd', emoji: '🎬', name: '흥부자 예능PD', persona: '웃기고 개성 넘치는 그림에 후한 예능 PD. 리액션이 크고 유머러스한 말투.' },
@@ -537,15 +552,17 @@ async function geminiJudge(sub) {
 }
 async function judgeChunk(sub, judge, onBusy) {
   const theme = state.theme || DEFAULT_THEME;
-  const prompt = `당신은 회사 워크샵 "얼굴 그리기 대회"의 AI 심사위원 3명 중 한 명인 "${judge.name}"입니다.
+  const prompt = `${COMMON_RULES}
+
+당신은 회사 워크샵 "얼굴 그리기 대회"의 AI 심사위원 3명 중 한 명인 "${judge.name}"입니다.
 성격과 말투: ${judge.persona}
 다른 심사위원과 상의하지 않고 독립적으로 채점합니다. 회사 동료끼리의 즐거운 자리이니 따뜻함은 잃지 마세요.
 대회 주제: "${theme}"
-참가자들은 휴대폰 화면에 손가락으로 아바타 얼굴을 그리고, 그림의 '포인트'를 한 줄로 적었습니다.
-아래에 참가자마다 [번호] id, 이름, 포인트 설명, 그리고 그림 이미지가 차례로 주어집니다.
+참가자들은 휴대폰 화면에 손가락으로 아바타 얼굴을 그리고, '인물 표현 포인트'를 한 줄로 적었습니다.
+아래에 참가자마다 [번호] id, 인물 표현 포인트, 그리고 그림 이미지가 차례로 주어집니다. (공정성을 위해 이름은 제공하지 않습니다)
 
 각 그림을 4개 항목으로 0~100점 채점하세요. (괄호 안은 총점 반영 비중)
-- match (포인트 일치, 35%): 본인이 적은 한 줄 포인트와 실제 그림이 얼마나 닮았는가. 포인트에 적은 특징이 그림에서 보이는가
+- match (포인트 일치, 35%): 인물 표현 포인트에 적은 특징이 그림에서 실제로 확인되는가
 - expression (표현력, 20%): 표정, 특징, 색 사용 등 묘사력
 - completeness (완성도, 30%): 정성, 채움 정도, 마무리
 - personality (개성, 15%): 남들과 다른 독특함, 재미, 아이디어
@@ -553,14 +570,15 @@ async function judgeChunk(sub, judge, onBusy) {
 참가자들은 여러 조로 나뉘어 따로 심사될 수 있으니, 조와 상관없이 위 기준으로 절대평가하세요.
 
 규칙:
-- 손가락 그림이라는 점을 감안해 너무 짜게 주지 말되(대략 55~98점), 순위가 분명히 갈리도록 참가자끼리 점수 차이를 두고 총점 동점은 피하세요.
-- comment: 그림에 대한 재치 있고 따뜻한 한 줄 평 (한국어, 40자 이내). 실제 사람의 외모를 비하하지 말고, 웃기되 기분 좋게.
+- 손가락으로 그린 그림이라는 점은 모든 참가자에게 똑같이 감안하되, 근거 없이 점수를 높이거나 낮추지 마세요.
+- reason: 점수의 구체적인 근거 (한국어, 50자 이내). 그림에서 실제로 확인되는 것만 근거로 쓰세요.
+- comment: 당신의 말투로 쓴 재치 있는 한 줄 심사평 (한국어, 40자 이내). 참가자를 비하하거나 외모를 조롱하지 마세요.
 - 모든 참가자를 빠짐없이 채점하세요.
 - 반드시 아래 형식의 JSON 배열만 출력하세요.
-[{"id":"참가자id","match":0,"expression":0,"completeness":0,"personality":0,"comment":"한 줄 평"}]`;
+[{"id":"참가자id","match":0,"expression":0,"completeness":0,"personality":0,"reason":"점수 근거","comment":"한 줄 심사평"}]`;
   const parts = [{ text: prompt }];
   for (const [i, p] of sub.entries()) {
-    parts.push({ text: `[${i + 1}] id=${p.id} / 이름=${p.name} / 포인트="${p.point || '(미작성)'}"${p.partial ? ' / 시간 내 미제출(그린 데까지)' : ''}` });
+    parts.push({ text: `[${i + 1}] id=${p.id} / 인물 표현 포인트="${p.point || '(미작성)'}"${p.partial ? ' / 시간 내 미제출(그린 데까지)' : ''}` });
     const img = await toJpeg(p.drawing);
     parts.push({ inline_data: { mime_type: img.mime, data: img.data } });
   }
@@ -586,7 +604,7 @@ async function publishResults(sub, scores, mode) {
     if (scores) {
       const js = JUDGES.map(j => {
         const s = scores[p.id]?.judges?.[j.id]; if (!s) return null;
-        const o = { id: j.id, emoji: j.emoji, name: j.name, match: clamp(s.match), expression: clamp(s.expression), completeness: clamp(s.completeness), personality: clamp(s.personality), comment: String(s.comment || '').slice(0, 80) };
+        const o = { id: j.id, emoji: j.emoji, name: j.name, match: clamp(s.match), expression: clamp(s.expression), completeness: clamp(s.completeness), personality: clamp(s.personality), comment: String(s.comment || '').slice(0, 80), reason: String(s.reason || '').slice(0, 100) };
         o.total = Math.round((o.match * 0.35 + o.expression * 0.2 + o.completeness * 0.3 + o.personality * 0.15) * 10) / 10; return o;
       }).filter(Boolean);
       const avg = k => Math.round(js.reduce((a, o) => a + o[k], 0) / js.length);
@@ -615,6 +633,18 @@ function judgeRows(r) {
   const js = r.ai?.judges;
   if (!js || !js.length) return r.ai?.comment ? `<div class="cmt">🤖 "${esc(r.ai.comment)}"</div>` : '';
   return `<div class="jrows">${js.map(j => `<div class="jrow"><span class="je">${j.emoji}</span><div><b>${esc(j.name)}<em>${j.total}점</em></b>"${esc(j.comment)}"</div></div>`).join('')}</div>`;
+}
+// slowly scroll a long list up and down so everything gets its moment on the big screen
+function autoScroll(box) {
+  if (!box) return; let dir = 1, pause = 120;
+  (function step() {
+    if (!box.isConnected) return;
+    if (box.scrollHeight > box.clientHeight + 4) {
+      if (pause > 0) pause--;
+      else { box.scrollTop += dir * 0.6; if (box.scrollTop + box.clientHeight >= box.scrollHeight - 1 || box.scrollTop <= 0) { dir = -dir; pause = 180; } }
+    }
+    requestAnimationFrame(step);
+  })();
 }
 const maxReveal = () => ((results?.ranking?.length || 0) > 3 ? 5 : 4);
 function renderReveal() {
@@ -645,7 +675,8 @@ function renderReveal() {
   }
   if (rev >= 5) {
     const n = rk.length - 3, cols = n <= 4 ? 2 : n <= 9 ? 3 : 4;
-    el.innerHTML = `<div class="restv"><h2>📝 나머지 순위 · 심사평</h2><div class="rgrid" style="grid-template-columns:repeat(${cols},1fr)">${rk.slice(3).map((r, i) => `<div class="rc"><div class="rc-top"><b class="rc-rk">${i + 4}위</b><img src="${imgOf(r.id)}" alt=""><div class="rc-who"><div class="rc-nm">${esc(r.name)}</div><div class="rc-pt">${r.point ? `「${esc(r.point)}」` : '(그리던 중 참가)'}</div></div><div class="rc-sc">${results.mode === 'ai' ? `${r.final}<small>점</small>` : ''}<span>❤️ ${r.likes}</span></div></div>${(r.ai?.judges || []).map(j => `<div class="rc-cm">${j.emoji} ${esc(j.comment)}</div>`).join('')}</div>`).join('')}</div></div>`;
+    el.innerHTML = `<div class="restv"><h2>📝 나머지 순위 · 심사평</h2><div class="rgrid" style="grid-template-columns:repeat(${cols},1fr)">${rk.slice(3).map((r, i) => `<div class="rc"><div class="rc-top"><b class="rc-rk">${i + 4}위</b><img src="${imgOf(r.id)}" alt=""><div class="rc-who"><div class="rc-nm">${esc(r.name)}</div><div class="rc-pt">${r.point ? `「${esc(r.point)}」` : '(그리던 중 참가)'}</div></div><div class="rc-sc">${results.mode === 'ai' ? `${r.final}<small>점</small>` : ''}<span>❤️ ${r.likes}</span></div></div>${(r.ai?.judges || []).map(j => `<div class="rc-j"><div class="rc-jh">${j.emoji} ${esc(j.name)}<em>${j.total}점</em></div><div class="rc-jc">"${esc(j.comment)}"</div></div>`).join('')}</div>`).join('')}</div></div>`;
+    autoScroll(el.querySelector('.restv'));
     return;
   }
   const pod = [1, 0, 2].filter(i => rk[i]).map(i => `<div class="pod p${i + 1}"><div class="av">${avatarHTML({ name: rk[i].name, img: imgOf(rk[i].id), outfit: players[rk[i].id]?.outfit })}</div><div class="stand" style="height:${[200, 150, 110][i]}px">${['🥇', '🥈', '🥉'][i]}<small>${fmt(rk[i])}</small></div></div>`).join('');
@@ -714,7 +745,7 @@ async function saveArchive() {
     if (!files.length) { toast('저장할 그림이 아직 없어요'); return; }
     const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const csv = ['순위,이름,포인트,최종점수,AI점수,좋아요,포인트일치,표현력,완성도,개성,' + JUDGES.map(j => j.name).join(',')]
-      .concat(rows.map(({ r, rank }) => [rank || '', r.name, r.point, r.final ?? '', r.ai?.total ?? '', r.likes ?? '', r.ai?.match ?? '', r.ai?.expression ?? '', r.ai?.completeness ?? '', r.ai?.personality ?? '', ...JUDGES.map(j => (r.ai?.judges || []).find(x => x.id === j.id)?.comment || '')].map(q).join(','))).join('\r\n');
+      .concat(rows.map(({ r, rank }) => [rank || '', r.name, r.point, r.final ?? '', r.ai?.total ?? '', r.likes ?? '', r.ai?.match ?? '', r.ai?.expression ?? '', r.ai?.completeness ?? '', r.ai?.personality ?? '', ...JUDGES.map(j => { const x = (r.ai?.judges || []).find(y => y.id === j.id); return x ? `${x.total}점 / ${x.comment}${x.reason ? ` (근거: ${x.reason})` : ''}` : ''; })].map(q).join(','))).join('\r\n');
     files.push({ name: '결과.csv', data: new TextEncoder().encode('\uFEFF' + csv) });
     const a = document.createElement('a'); a.href = URL.createObjectURL(makeZip(files));
     const d = new Date(); a.download = `얼굴그리기_${room}_${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}.zip`;
