@@ -65,6 +65,14 @@
   .rank .medal { font-size: 28px; }
   .mine { background: linear-gradient(135deg, #6c5ce7, #a06cf0); color: #fff; border-radius: 20px; padding: 18px; width: 100%; margin-top: 10px; }
   .mine .big { font-size: 34px; font-weight: 900; }
+  .ofit { border: 2px solid #e2dcf2; background: #fff; border-radius: 12px; padding: 4px 4px 2px; width: 62px; font-size: 11px; font-weight: 800; color: #4b4f9e; }
+  .ofit.on { border-color: var(--purple); background: #f1edff; }
+  .ofit-prev { width: 100%; height: 36px; position: relative; }
+  .ofit-prev .av-svg { filter: none; }
+  .oc { width: 26px; height: 26px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 1px #d6d0e8; }
+  .oc.on { box-shadow: 0 0 0 3px var(--purple); }
+  .picker { width: 100%; background: #fff; border-radius: 16px; padding: 10px 8px 4px; margin-top: 8px; box-shadow: 0 2px 8px rgba(80,60,160,.08); }
+  .picker-t { font-weight: 800; font-size: 14px; text-align: left; padding-left: 6px; }
   .demo { background: #fff3c4; color: #8a6d00; font-size: 12px; padding: 6px 10px; border-radius: 10px; margin-bottom: 8px; text-align: center; }
 </style>
 </head>
@@ -74,7 +82,7 @@
 </div>
 
 <script type="module">
-import { initDB, DEMO, params, uid, esc, roomPath, avatarHTML, DEFAULT_THEME } from './shared.js';
+import { initDB, DEMO, params, uid, esc, roomPath, avatarHTML, DEFAULT_THEME, OUTFITS, OUTFIT_COLORS, DEFAULT_OUTFIT, bodySVG } from './shared.js';
 
 const room = (params.get('room') || 'MAIN').toUpperCase();
 const R = roomPath(room);
@@ -90,9 +98,9 @@ const S = 600; // internal canvas size
 const COLORS = ['#222222', '#6b4423', '#e53935', '#ff7aa8', '#ff9800', '#fdd835', '#43a047', '#1e88e5', '#8e24aa', '#ffffff'];
 const SKINS = ['#f6d7b8', '#f1c27d', '#e0ac69', '#8d5524', '#ffffff'];
 const SIZES = [6, 14, 30];
-let tool = { color: COLORS[0], size: SIZES[1], eraser: false, skin: SKINS[0] };
+let tool = { color: COLORS[0], size: SIZES[1], eraser: false, skin: SKINS[0], outfit: { ...DEFAULT_OUTFIT } };
 let strokes = [];
-try { const saved = JSON.parse(store.getItem(STROKE_KEY)); if (saved) { strokes = saved.strokes || []; tool.skin = saved.skin || tool.skin; } } catch {}
+try { const saved = JSON.parse(store.getItem(STROKE_KEY)); if (saved) { strokes = saved.strokes || []; tool.skin = saved.skin || tool.skin; if (saved.outfit) tool.outfit = saved.outfit; } } catch {}
 
 const me = () => players?.[pid];
 const banner = () => (DEMO ? '<div class="demo">데모 모드: 같은 브라우저의 탭끼리만 연결돼요</div>' : '');
@@ -142,7 +150,7 @@ function renderJoin() {
     document.getElementById('go').disabled = true;
     pid = uid(); store.setItem(PID_KEY, pid);
     strokes = []; store.removeItem(STROKE_KEY);
-    await db.set(`${R}/players/${pid}`, { name, status: 'drawing', joinedAt: db.now() });
+    await db.set(`${R}/players/${pid}`, { name, status: 'drawing', joinedAt: db.now(), outfit: tool.outfit });
   };
   document.getElementById('go').onclick = go;
   inp.onkeydown = e => { if (e.key === 'Enter') go(); };
@@ -155,9 +163,35 @@ function renderClosed() {
 function renderWait() {
   const m = me();
   app.innerHTML = `${header()}<div class="center">
-    <div class="mini bounce"><div class="av">${avatarHTML({ name: m.name })}</div></div>
+    <div class="mini bounce" id="waitAv"><div class="av">${avatarHTML({ name: m.name, outfit: tool.outfit })}</div></div>
     <h1>${esc(m.name)}님 입장 완료!</h1>
-    <p class="sub">진행자가 시작하면 바로 그릴 수 있어요.<br>대형 화면에 내 아바타가 보이나요? 👀</p></div>`;
+    <p class="sub">진행자가 시작하면 바로 그릴 수 있어요.<br>그동안 입을 옷을 골라보세요 👕</p>
+    ${pickerHTML()}</div>`;
+  bindPicker(() => { const w = document.getElementById('waitAv'); if (w) w.innerHTML = `<div class="av">${avatarHTML({ name: me().name, outfit: tool.outfit })}</div>`; });
+  syncOutfit();
+}
+
+/* ───────────── outfit picker ───────────── */
+function pickerHTML() {
+  return `<div class="picker"><div class="picker-t">👕 옷 고르기</div>
+    <div class="tools" id="outfits">${OUTFITS.map(o => `<button class="ofit" data-o="${o.id}"><div class="ofit-prev">${bodySVG({ type: o.id, color: tool.outfit.color })}</div>${o.label}</button>`).join('')}</div>
+    <div class="tools">${OUTFIT_COLORS.map(c => `<button class="oc" data-oc="${c}" style="background:${c}" aria-label="옷 색"></button>`).join('')}</div></div>`;
+}
+function bindPicker(onChange) {
+  const paint = () => {
+    document.querySelectorAll('.ofit').forEach(b => { b.classList.toggle('on', b.dataset.o === tool.outfit.type); b.querySelector('.ofit-prev').innerHTML = bodySVG({ type: b.dataset.o, color: tool.outfit.color }); });
+    document.querySelectorAll('.oc').forEach(b => b.classList.toggle('on', b.dataset.oc === tool.outfit.color));
+  };
+  document.querySelectorAll('.ofit').forEach(b => b.onclick = () => { tool.outfit = { ...tool.outfit, type: b.dataset.o }; paint(); saveLocal(); syncOutfit(); onChange && onChange(); });
+  document.querySelectorAll('.oc').forEach(b => b.onclick = () => { tool.outfit = { ...tool.outfit, color: b.dataset.oc }; paint(); saveLocal(); syncOutfit(); onChange && onChange(); });
+  paint();
+}
+let outfitSent = '';
+function syncOutfit() {
+  const m = me(); if (!m) return;
+  const s = JSON.stringify(tool.outfit);
+  if (s === outfitSent || s === JSON.stringify(m.outfit || null)) { outfitSent = s; return; }
+  outfitSent = s; db.update(`${R}/players/${pid}`, { outfit: tool.outfit });
 }
 
 /* ───────────── draw ───────────── */
@@ -175,11 +209,12 @@ function renderDraw() {
       <button class="tbtn" id="clear">🗑</button>
     </div>
     <div class="tools"><span style="font-size:12px;color:var(--muted)">피부색</span>${SKINS.map(c => `<button class="skin" data-k="${c}" style="background:${c}" aria-label="피부색"></button>`).join('')}</div>
+    ${pickerHTML()}
     <button class="btn" id="finish">다 그렸어요! ✨</button>
     <div class="hint">그리는 동안 대형 화면에 랜덤으로 내 그림이 보여요</div>`;
   base = document.getElementById('base'); ink = document.getElementById('ink');
   bctx = base.getContext('2d'); ictx = ink.getContext('2d');
-  drawBase(); redraw(); syncTools();
+  drawBase(); redraw(); syncTools(); bindPicker(); syncOutfit();
 
   document.querySelectorAll('.color').forEach(b => b.onclick = () => { tool.color = b.dataset.c; tool.eraser = false; syncTools(); });
   document.querySelectorAll('.size').forEach(b => b.onclick = () => { tool.size = +b.dataset.s; syncTools(); });
@@ -248,7 +283,7 @@ function segment(ctx, st, from, pts) {
   pts.forEach(q => ctx.lineTo(q[0], q[1])); ctx.stroke(); ctx.globalCompositeOperation = 'source-over';
 }
 function redraw() { ictx.clearRect(0, 0, S, S); strokes.forEach(s => drawStroke(ictx, s)); }
-function saveLocal() { try { store.setItem(STROKE_KEY, JSON.stringify({ strokes, skin: tool.skin })); } catch {} }
+function saveLocal() { try { store.setItem(STROKE_KEY, JSON.stringify({ strokes, skin: tool.skin, outfit: tool.outfit })); } catch {} }
 
 function exportPNG(size) {
   const c = document.createElement('canvas'); c.width = c.height = size; const ctx = c.getContext('2d');
@@ -272,7 +307,7 @@ function openSubmit() {
   const div = document.createElement('div'); div.className = 'sheet';
   div.innerHTML = `<div>
     <div style="display:flex;gap:14px;align-items:center">
-      <div class="mini" style="width:110px;height:150px;flex:none"><div class="av" style="--s:84px">${avatarHTML({ name: me().name, img: finalImg })}</div></div>
+      <div class="mini" style="width:110px;height:150px;flex:none"><div class="av" style="--s:84px">${avatarHTML({ name: me().name, img: finalImg, outfit: tool.outfit })}</div></div>
       <div><h2>아바타 포인트 한 줄!</h2><p class="sub" style="margin:0;font-size:14px">AI 심사위원이 이 설명도 참고해요</p></div>
     </div>
     <input class="field" id="point" maxlength="30" placeholder="예) 후드티 쓴 훈남, 안경이 포인트" style="margin-top:12px" value="${esc(me().point || '')}">
@@ -298,7 +333,7 @@ function openSubmit() {
 function renderDone() {
   const m = me();
   app.innerHTML = `${header()}<div class="center" style="justify-content:flex-start">
-    <div class="mini bounce" style="margin-top:46px"><div class="av talk">${avatarHTML({ name: m.name, img: m.drawing })}</div></div>
+    <div class="mini bounce" style="margin-top:46px"><div class="av talk">${avatarHTML({ name: m.name, img: m.drawing, outfit: m.outfit || tool.outfit })}</div></div>
     <h1 style="margin-top:4px">제출 완료! 🎉</h1>
     <p class="sub">대형 화면에서 내 아바타를 찾아보세요.</p>
     <button class="btn ghost" id="redo" style="max-width:220px;padding:10px;font-size:15px">다시 그리기</button>
