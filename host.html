@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>얼굴 그리기 대회 · 진행자 화면</title>
-<link rel="stylesheet" href="shared.css?v=2">
+<link rel="stylesheet" href="shared.css?v=3">
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <style>
   body { overflow: hidden; background: radial-gradient(1200px 700px at 50% 30%, #dff3ea, #bfe2d4); }
@@ -73,7 +73,8 @@
   .medal.m2 { background: radial-gradient(circle at 35% 30%, #fff, #b7bcc7); color: #3d4250; }
   .medal.m3 { background: radial-gradient(circle at 35% 30%, #ffd8b0, #c77b3a); color: #4a2600; }
   .rv .pt { font-size: 30px; font-weight: 800; color: #ffe27a; margin: 10px 0 24px; }
-  .bar { display: grid; grid-template-columns: 90px 1fr 56px; gap: 14px; align-items: center; font-size: 22px; font-weight: 800; margin: 10px 0; }
+  .bar small { font-size: 15px; opacity: .65; }
+  .bar { display: grid; grid-template-columns: 175px 1fr 56px; gap: 14px; align-items: center; font-size: 22px; font-weight: 800; margin: 10px 0; }
   .bar .tr { height: 18px; background: rgba(255,255,255,.15); border-radius: 99px; overflow: hidden; }
   .bar .fl { height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, #8f7cff, #6be0ff); transition: width 1.2s cubic-bezier(.2,.8,.2,1); }
   .bar .v { text-align: right; font-variant-numeric: tabular-nums; }
@@ -101,6 +102,9 @@
   #settings input { width: 100%; padding: 11px 13px; border: 2px solid #e2e0ee; border-radius: 12px; font-size: 16px; }
   #settings .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
   #settings .btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+  .bgrow { display: flex; gap: 8px; flex-wrap: wrap; }
+  .bgopt { width: 88px; height: 54px; border-radius: 10px; border: 3px solid #e2e0ee; padding: 0; display: flex; align-items: flex-end; justify-content: center; font-weight: 800; font-size: 12px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.6); background-size: cover !important; background-position: center !important; }
+  .bgopt.on { border-color: var(--purple); box-shadow: 0 0 0 2px var(--purple); }
   #settings hr { border: 0; border-top: 1px solid #eee; margin: 20px 0 6px; }
   .demo-banner { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: #fff3c4; color: #7a5f00; font-weight: 700; padding: 6px 14px; border-radius: 10px; z-index: 25; font-size: 14px; }
   #confetti { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
@@ -141,7 +145,7 @@
 <div id="controls"></div>
 
 <div id="judging" class="overlay hidden"><div class="box">
-  <span class="robot">🤖</span><h2>AI 심사 중…</h2><p id="judgeMsg">주제 · 창의성 · 표현력 · 완성도를 보고 있어요</p>
+  <span class="robot">🤖</span><h2>AI 심사 중…</h2><p id="judgeMsg">포인트 일치 · 표현력 · 완성도 · 개성을 보고 있어요</p>
   <div class="scan" id="scan"></div><div id="judgeErr"></div>
 </div></div>
 
@@ -155,6 +159,9 @@
     <div><label>그리기 시간(분) <small>0 = 타이머 없음</small></label><input id="sMinutes" type="number" min="0" max="60"></div>
     <div><label>AI 점수 비중(%) <small>나머지는 좋아요</small></label><input id="sWeight" type="number" min="0" max="100"></div>
   </div>
+  <label>배경 <small>(진행자 화면에만 보여요 · 누르면 바로 바뀌어요)</small></label>
+  <div class="bgrow" id="sBgs"></div>
+  <label class="sbtn" style="display:inline-block;margin-top:10px;cursor:pointer">🖼️ 내 이미지로 배경 바꾸기<input type="file" id="sBgFile" accept="image/*" hidden></label>
   <label>Gemini API 키 <small>(이 컴퓨터 브라우저에만 저장돼요)</small></label>
   <input id="sKey" type="password" placeholder="AIza..." autocomplete="off">
   <label>Gemini 모델 <small>(auto = 사용 가능한 최신 Flash 모델 자동 선택)</small></label>
@@ -173,7 +180,7 @@
 <canvas id="confetti"></canvas>
 
 <script type="module">
-import { initDB, DEMO, params, uid, esc, roomPath, avatarHTML, DEFAULT_THEME, botFace, BOT_NAMES, BOT_POINTS, randomOutfit } from './shared.js?v=2';
+import { initDB, DEMO, params, uid, esc, roomPath, avatarHTML, DEFAULT_THEME, botFace, BOT_NAMES, BOT_POINTS, randomOutfit } from './shared.js?v=3';
 
 /* ───────────── room & settings ───────────── */
 const genCode = () => Array.from({ length: 4 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
@@ -288,7 +295,8 @@ function onPlayers() {
     let isNew = false;
     if (!b) {
       const el = document.createElement('div'); el.className = 'av'; stage.appendChild(el);
-      b = { el, x: Math.random() * (W - headSize), y: 80 + Math.random() * H * 0.3, vx: (Math.random() < .5 ? -1 : 1) * (60 + Math.random() * 120), vy: 0, key: '', img: '' };
+      const ang = Math.random() * Math.PI * 2, spd = 70 + Math.random() * 190;
+      b = { el, x: Math.random() * (W - headSize), y: 80 + Math.random() * (H - headSize * 1.6), vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, key: '', img: '' };
       bodies.set(p.id, b); isNew = true;
     }
     if (b.key !== key) {
@@ -321,39 +329,36 @@ let last = performance.now();
 function loop(now) {
   const dt = Math.min(0.033, (now - last) / 1000); last = now;
   const W = innerWidth, H = innerHeight; const top = 80;
-  const g = 1500 * (H / 1000);
   const arr = [...bodies.values()];
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  // a wall hit picks a new random speed and nudges the angle, so every avatar keeps its own rhythm
+  const rebound = b => { const s = Math.max(60, Math.min(320, Math.hypot(b.vx, b.vy) * rnd(0.8, 1.25))); const a = Math.atan2(b.vy, b.vx) + rnd(-0.35, 0.35); b.vx = Math.cos(a) * s; b.vy = Math.sin(a) * s; b.squash = 1; };
   for (const b of arr) {
     const w = headSize * 1.05, h = headSize * 1.5;
     b.w = w; b.h = h;
-    b.vy += g * dt; b.x += b.vx * dt; b.y += b.vy * dt;
-    if (b.y + h > H) {
-      b.y = H - h;
-      const hop = (0.18 + Math.random() * 0.42) * (H - top - h);
-      b.vy = -Math.sqrt(2 * g * Math.max(hop, 40));
-      b.vx += (Math.random() - 0.5) * 80; b.vx = Math.max(-240, Math.min(240, b.vx));
-      if (Math.abs(b.vx) < 40) b.vx = (b.vx < 0 ? -1 : 1) * 60;
-      b.squash = 1;
-    }
-    if (b.y < top) { b.y = top; b.vy = Math.abs(b.vy) * 0.5; }
-    if (b.x < 0) { b.x = 0; b.vx = Math.abs(b.vx); }
-    if (b.x + w > W) { b.x = W - w; b.vx = -Math.abs(b.vx); }
+    if (Math.random() < dt * 0.12) { const a = rnd(0, Math.PI * 2), s = rnd(70, 280); b.vx = Math.cos(a) * s; b.vy = Math.sin(a) * s; } // occasional change of mind
+    b.x += b.vx * dt; b.y += b.vy * dt;
+    if (b.x < 0) { b.x = 0; b.vx = Math.abs(b.vx); rebound(b); }
+    if (b.x + w > W) { b.x = W - w; b.vx = -Math.abs(b.vx); rebound(b); }
+    if (b.y < top) { b.y = top; b.vy = Math.abs(b.vy); rebound(b); }
+    if (b.y + h > H) { b.y = H - h; b.vy = -Math.abs(b.vy); rebound(b); }
   }
-  // soft separation
+  // bump into each other
   for (let i = 0; i < arr.length; i++) for (let j = i + 1; j < arr.length; j++) {
     const a = arr[i], c = arr[j];
     const dx = (c.x + c.w / 2) - (a.x + a.w / 2), dy = (c.y + c.h / 2) - (a.y + a.h / 2);
-    const minX = (a.w + c.w) / 2 * 0.8, minY = (a.h + c.h) / 2 * 0.8;
-    if (Math.abs(dx) < minX && Math.abs(dy) < minY) {
-      const push = (minX - Math.abs(dx)) / 2 * (dx < 0 ? -1 : 1) * 0.3;
-      a.x -= push; c.x += push;
-      if ((c.vx - a.vx) * dx < 0) { const t = a.vx; a.vx = c.vx; c.vx = t; }
+    const dist = Math.hypot(dx, dy) || 1, minD = (a.w + c.w) / 2 * 0.85;
+    if (dist < minD) {
+      const nx = dx / dist, ny = dy / dist, push = (minD - dist) / 2;
+      a.x -= nx * push; a.y -= ny * push; c.x += nx * push; c.y += ny * push;
+      const rel = (c.vx - a.vx) * nx + (c.vy - a.vy) * ny;
+      if (rel < 0) { a.vx += rel * nx; a.vy += rel * ny; c.vx -= rel * nx; c.vy -= rel * ny; a.squash = c.squash = 0.6; }
     }
   }
   for (const b of arr) {
-    const sq = b.squash ? 1 - b.squash * 0.12 : 1; if (b.squash) b.squash = Math.max(0, b.squash - dt * 6);
-    b.el.style.transform = `translate(${b.x}px, ${b.y}px) rotate(${b.vx * 0.03}deg) scale(${2 - sq}, ${sq})`;
-    b.el.style.transformOrigin = '50% 100%';
+    const sq = b.squash ? 1 - b.squash * 0.14 : 1; if (b.squash) b.squash = Math.max(0, b.squash - dt * 6);
+    b.el.style.transform = `translate(${b.x}px, ${b.y}px) rotate(${Math.max(-14, Math.min(14, b.vx * 0.04))}deg) scale(${2 - sq}, ${sq})`;
+    b.el.style.transformOrigin = '50% 60%';
   }
   requestAnimationFrame(loop);
 }
@@ -380,12 +385,22 @@ let judgingRunning = false;
 function paintScan() {
   $('scan').innerHTML = list().filter(p => p.status === 'submitted' && p.drawing).map((p, i) => `<img src="${p.drawing}" style="animation-delay:${(i % 10) * 0.12}s" alt="">`).join('');
 }
+const isIn = p => p.status === 'submitted' && p.drawing;
 async function closeAndJudge() {
-  const all = list(); const sub = all.filter(p => p.status === 'submitted' && p.drawing);
-  if (!sub.length) { toast('아직 제출한 사람이 없어요!'); return; }
-  const miss = all.length - sub.length;
-  if (miss && !confirm(`아직 제출하지 않은 ${miss}명은 심사에서 빠져요. 마감할까요?`)) return;
+  const all = list(); const sub = all.filter(isIn);
+  const partial = all.filter(p => !isIn(p) && live[p.id]);
+  const none = all.length - sub.length - partial.length;
+  if (!sub.length && !partial.length) { toast('아직 그림을 그린 사람이 없어요!'); return; }
+  if ((partial.length || none) && !confirm(`미제출 ${partial.length}명은 지금까지 그린 그림으로 참가해요.${none ? `\n(아무것도 안 그린 ${none}명은 빠져요)` : ''}\n마감할까요?`)) return;
   await db.update(`${R}/state`, { phase: 'judging', closedAt: db.now() });
+  if (partial.length) {
+    $('judgeMsg').textContent = '아직 그리던 그림까지 모으는 중… ✏️';
+    await sleep(4000); // phones upload their full-size drawing on close
+    const upd = {};
+    for (const p of list()) if (!isIn(p) && live[p.id]) Object.assign(upd, { [`${p.id}/drawing`]: live[p.id], [`${p.id}/status`]: 'submitted', [`${p.id}/partial`]: true, [`${p.id}/submittedAt`]: db.now() });
+    if (Object.keys(upd).length) await db.update(`${R}/players`, upd);
+    await sleep(300);
+  }
   runJudge();
 }
 function showJudgeRecover() {
@@ -397,7 +412,7 @@ async function backToDrawing() { $('judgeErr').innerHTML = ''; await db.update(`
 
 async function runJudge() {
   if (judgingRunning) return; judgingRunning = true;
-  $('judgeErr').innerHTML = ''; $('judgeMsg').textContent = '주제 · 창의성 · 표현력 · 완성도를 보고 있어요';
+  $('judgeErr').innerHTML = ''; $('judgeMsg').textContent = '포인트 일치 · 표현력 · 완성도 · 개성을 보고 있어요';
   const sub = list().filter(p => p.status === 'submitted' && p.drawing).sort((a, b) => (a.submittedAt || 0) - (b.submittedAt || 0));
   try {
     if (!cfg.key) throw new Error('Gemini API 키가 아직 설정되지 않았어요. ⚙️ 설정에서 입력해 주세요.');
@@ -468,21 +483,22 @@ async function geminiJudge(sub) {
 참가자들은 휴대폰 화면에 손가락으로 아바타 얼굴을 그리고, 그림의 '포인트'를 한 줄로 적었습니다.
 아래에 참가자마다 [번호] id, 이름, 포인트 설명, 그리고 그림 이미지가 차례로 주어집니다.
 
-각 그림을 4개 항목으로 0~100점 채점하세요.
-- topic (주제): 대회 주제와 본인이 적은 포인트 설명이 그림에 잘 드러나는가
-- creativity (창의성): 아이디어와 재미, 독특함
-- expression (표현력): 표정, 특징, 색 사용 등 묘사력
-- completeness (완성도): 정성과 마무리
+각 그림을 4개 항목으로 0~100점 채점하세요. (괄호 안은 총점 반영 비중)
+- match (포인트 일치, 35%): 본인이 적은 한 줄 포인트와 실제 그림이 얼마나 닮았는가. 포인트에 적은 특징이 그림에서 보이는가
+- expression (표현력, 20%): 표정, 특징, 색 사용 등 묘사력
+- completeness (완성도, 30%): 정성, 채움 정도, 마무리
+- personality (개성, 15%): 남들과 다른 독특함, 재미, 아이디어
+포인트가 '(미작성)'이면 match는 대회 주제와 그림이 얼마나 어울리는지로 평가하세요. '시간 내 미제출'로 표시된 그림은 그린 데까지만 보고 평가하되 완성도에 그만큼 반영하세요.
 
 규칙:
 - 손가락 그림이라는 점을 감안해 너무 짜게 주지 말되(대략 55~98점), 순위가 분명히 갈리도록 참가자끼리 점수 차이를 두고 총점 동점은 피하세요.
 - comment: 그림에 대한 재치 있고 따뜻한 한 줄 평 (한국어, 40자 이내). 실제 사람의 외모를 비하하지 말고, 웃기되 기분 좋게.
 - 모든 참가자를 빠짐없이 채점하세요.
 - 반드시 아래 형식의 JSON 배열만 출력하세요.
-[{"id":"참가자id","topic":0,"creativity":0,"expression":0,"completeness":0,"comment":"한 줄 평"}]`;
+[{"id":"참가자id","match":0,"expression":0,"completeness":0,"personality":0,"comment":"한 줄 평"}]`;
   const parts = [{ text: prompt }];
   sub.forEach((p, i) => {
-    parts.push({ text: `[${i + 1}] id=${p.id} / 이름=${p.name} / 포인트="${p.point || ''}"` });
+    parts.push({ text: `[${i + 1}] id=${p.id} / 이름=${p.name} / 포인트="${p.point || '(미작성)'}"${p.partial ? ' / 시간 내 미제출(그린 데까지)' : ''}` });
     parts.push({ inline_data: { mime_type: 'image/png', data: p.drawing.split(',')[1] } });
   });
   const { data } = await callGemini({ contents: [{ role: 'user', parts }], generationConfig: { responseMimeType: 'application/json', temperature: 0.7 } },
@@ -507,8 +523,8 @@ async function publishResults(sub, scores, mode) {
     const likes = likeCount(p); let ai = null, final;
     if (scores) {
       const s = scores[p.id];
-      ai = { topic: clamp(s.topic), creativity: clamp(s.creativity), expression: clamp(s.expression), completeness: clamp(s.completeness), comment: String(s.comment || '').slice(0, 80) };
-      ai.total = Math.round((ai.topic + ai.creativity + ai.expression + ai.completeness) / 4 * 10) / 10;
+      ai = { match: clamp(s.match), expression: clamp(s.expression), completeness: clamp(s.completeness), personality: clamp(s.personality), comment: String(s.comment || '').slice(0, 80) };
+      ai.total = Math.round((ai.match * 0.35 + ai.expression * 0.2 + ai.completeness * 0.3 + ai.personality * 0.15) * 10) / 10;
       final = maxLikes > 0 ? ai.total * w + (likes / maxLikes * 100) * (1 - w) : ai.total;
     } else final = likes;
     return { id: p.id, name: p.name, point: p.point || '', likes, ai, final: Math.round(final * 10) / 10, at: p.submittedAt || 0 };
@@ -542,12 +558,12 @@ function renderReveal() {
   if (rev <= 3) {
     const idx = 3 - rev; const r = rk[idx]; if (!r) return;
     const label = results.mode === 'ai' ? `최종 (AI ${results.weight}% + 좋아요 ${100 - results.weight}%)` : '최종 (좋아요 수)';
-    const bars = r.ai ? [['주제', r.ai.topic], ['창의성', r.ai.creativity], ['표현력', r.ai.expression], ['완성도', r.ai.completeness]]
+    const bars = r.ai ? [['포인트 일치 <small>35%</small>', r.ai.match], ['표현력 <small>20%</small>', r.ai.expression], ['완성도 <small>30%</small>', r.ai.completeness], ['개성 <small>15%</small>', r.ai.personality]]
       .map(([k, v]) => `<div class="bar"><span>${k}</span><div class="tr"><div class="fl" data-w="${v}"></div></div><span class="v">${v}</span></div>`).join('') : '';
     el.innerHTML = `<div class="rv"><div class="judge">AI JUDGE · 얼굴 그리기 대회</div><div class="rk">${idx + 1}위</div>
       <div class="row"><div class="pic"><div class="av">${avatarHTML({ name: r.name, img: imgOf(r.id), outfit: players[r.id]?.outfit })}</div></div>
       <div class="info"><div class="nm"><span class="medal m${idx + 1}">${idx + 1}</span>${esc(r.name)}</div>
-      <div class="pt">「${esc(r.point)}」</div>${bars}
+      <div class="pt">${r.point ? `「${esc(r.point)}」` : '<span style="opacity:.6;font-size:22px">(그리던 중 참가 · 포인트 미작성)</span>'}</div>${bars}
       ${r.ai?.comment ? `<div class="cmt">🤖 "${esc(r.ai.comment)}"</div>` : ''}
       <div class="final">${label}<b>${r.final}</b><span>❤️ ${r.likes}</span></div></div></div></div>`;
     setTimeout(() => el.querySelectorAll('.fl').forEach(f => f.style.width = f.dataset.w + '%'), 120);
@@ -572,8 +588,56 @@ function confetti() {
   })(t0);
 }
 
+/* ───────────── backgrounds ───────────── */
+const svgBg = svg => `url("data:image/svg+xml,${encodeURIComponent(svg)}") center / cover no-repeat`;
+const R0 = (n, f) => Array.from({ length: n }, (_, i) => f(i)).join('');
+const rr = (a, b) => Math.round(a + Math.random() * (b - a));
+const SVG0 = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 900' preserveAspectRatio='xMidYMid slice'>`;
+const BG_PHOTO = 'bg.jpg'; // workshop background image in the repo
+const BGS = {
+  photo: { label: '워크샵', css: () => `url("${BG_PHOTO}") center / cover no-repeat, #f3e7d3` },
+  mint: { label: '민트', css: () => 'radial-gradient(1200px 700px at 50% 30%, #dff3ea, #bfe2d4)' },
+  park: { label: '공원', css: () => svgBg(`${SVG0}<defs><linearGradient id='s' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#8fd3ff'/><stop offset='1' stop-color='#e8f8ff'/></linearGradient></defs><rect width='1600' height='900' fill='url(#s)'/><circle cx='1340' cy='170' r='80' fill='#ffe066'/><g fill='#fff' opacity='.92'><ellipse cx='300' cy='190' rx='120' ry='40'/><ellipse cx='370' cy='165' rx='80' ry='48'/><ellipse cx='880' cy='120' rx='140' ry='40'/><ellipse cx='960' cy='100' rx='75' ry='42'/></g><path d='M0 620 Q300 500 620 600 T1250 580 T1600 570 V900 H0Z' fill='#a6e57f'/><path d='M0 720 Q400 630 800 715 T1600 690 V900 H0Z' fill='#74cf5c'/><rect x='192' y='600' width='18' height='90' fill='#8b5a2b'/><circle cx='200' cy='585' r='62' fill='#3fa34d'/><rect x='1430' y='585' width='18' height='100' fill='#8b5a2b'/><circle cx='1440' cy='565' r='72' fill='#3fa34d'/>${R0(30, () => `<circle cx='${rr(0, 1600)}' cy='${rr(730, 890)}' r='6' fill='${['#ff8fb1', '#fff', '#ffd23f'][rr(0, 2)]}'/>`)}</svg>`) },
+  sea: { label: '바다', css: () => svgBg(`${SVG0}<defs><linearGradient id='s' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#6ec3ff'/><stop offset='1' stop-color='#ffe8c2'/></linearGradient></defs><rect width='1600' height='900' fill='url(#s)'/><circle cx='800' cy='560' r='130' fill='#ffb347'/><rect y='540' width='1600' height='260' fill='#2f8fdc'/>${R0(7, i => `<path d='M0 ${575 + i * 32} Q100 ${560 + i * 32} 200 ${575 + i * 32} T400 ${575 + i * 32} T600 ${575 + i * 32} T800 ${575 + i * 32} T1000 ${575 + i * 32} T1200 ${575 + i * 32} T1400 ${575 + i * 32} T1600 ${575 + i * 32}' fill='none' stroke='#fff' stroke-opacity='.35' stroke-width='4'/>`)}<path d='M0 780 Q400 740 800 780 T1600 770 V900 H0Z' fill='#f3d9a4'/><g fill='#fff' opacity='.9'><ellipse cx='260' cy='150' rx='110' ry='36'/><ellipse cx='1300' cy='220' rx='130' ry='38'/></g></svg>`) },
+  space: { label: '우주', css: () => svgBg(`${SVG0}<defs><radialGradient id='s' cx='.5' cy='.4' r='.8'><stop offset='0' stop-color='#3a2a6e'/><stop offset='1' stop-color='#0e0c24'/></radialGradient></defs><rect width='1600' height='900' fill='url(#s)'/>${R0(160, () => `<circle cx='${rr(0, 1600)}' cy='${rr(0, 900)}' r='${(Math.random() * 2.4 + 0.6).toFixed(1)}' fill='#fff' opacity='${(Math.random() * 0.7 + 0.3).toFixed(2)}'/>`)}<circle cx='1320' cy='220' r='90' fill='#ff9f6b'/><ellipse cx='1320' cy='220' rx='150' ry='28' fill='none' stroke='#ffd9a8' stroke-width='10' transform='rotate(-18 1320 220)'/><circle cx='230' cy='720' r='140' fill='#6ec6ff' opacity='.85'/><circle cx='190' cy='690' r='30' fill='#fff' opacity='.25'/></svg>`) },
+  party: { label: '파티', css: () => svgBg(`${SVG0}<defs><linearGradient id='s' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#7b5cff'/><stop offset='1' stop-color='#ff7ab6'/></linearGradient></defs><rect width='1600' height='900' fill='url(#s)'/>${R0(140, () => `<rect x='${rr(0, 1600)}' y='${rr(0, 900)}' width='${rr(8, 18)}' height='${rr(4, 9)}' rx='2' fill='${['#ffd23f', '#c6f24e', '#6be0ff', '#fff', '#ff5a4e'][rr(0, 4)]}' transform='rotate(${rr(0, 180)} 0 0)' opacity='.85'/>`)}${R0(8, i => `<path d='M${i * 220} 0 Q${i * 220 + 110} 70 ${i * 220 + 220} 0' fill='none' stroke='#ffd23f' stroke-width='5'/>`)}</svg>`) },
+  board: { label: '칠판', css: () => svgBg(`${SVG0}<rect width='1600' height='900' fill='#8b5a2b'/><rect x='40' y='40' width='1520' height='820' rx='12' fill='#2f5d4a'/><rect x='40' y='40' width='1520' height='820' rx='12' fill='none' stroke='#6b4220' stroke-width='12'/><g fill='none' stroke='#fff' stroke-opacity='.18' stroke-width='5' stroke-linecap='round'><path d='M180 200 q60 -60 120 0 t120 0'/><path d='M1200 160 l80 60 m0 -60 l-80 60'/><circle cx='1350' cy='700' r='60'/><path d='M200 720 l100 -80 l100 80 z'/><path d='M700 130 h220'/></g><rect x='600' y='840' width='400' height='14' rx='4' fill='#c9a36b'/><rect x='640' y='828' width='60' height='14' rx='4' fill='#fff'/><rect x='720' y='828' width='40' height='14' rx='4' fill='#ffd23f'/></svg>`) },
+  sunset: { label: '노을', css: () => svgBg(`${SVG0}<defs><linearGradient id='s' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#4b3b8f'/><stop offset='.55' stop-color='#ff8a65'/><stop offset='1' stop-color='#ffd180'/></linearGradient></defs><rect width='1600' height='900' fill='url(#s)'/><circle cx='800' cy='640' r='150' fill='#ffe082' opacity='.9'/><path d='M0 700 L160 560 L300 680 L470 520 L640 700 L800 600 L980 720 L1150 540 L1330 690 L1460 580 L1600 680 V900 H0Z' fill='#5d3a6e'/><path d='M0 780 Q400 720 800 780 T1600 760 V900 H0Z' fill='#3b2450'/></svg>`) },
+};
+const bgCache = {};
+function applyBg() {
+  let id = localStorage.getItem('facegame-bg') || 'photo'; let css;
+  if (id === 'custom') { const img = localStorage.getItem('facegame-bg-img'); css = img ? `url("${img}") center / cover no-repeat` : null; }
+  if (!css) { if (!BGS[id]) id = 'photo'; css = bgCache[id] || (bgCache[id] = BGS[id].css()); }
+  document.body.style.background = css; document.body.style.backgroundAttachment = 'fixed';
+  document.querySelectorAll('.bgopt').forEach(b => b.classList.toggle('on', b.dataset.bg === (localStorage.getItem('facegame-bg') || 'photo')));
+}
+function paintBgOptions() {
+  const custom = localStorage.getItem('facegame-bg-img');
+  $('sBgs').innerHTML = Object.entries(BGS).map(([id, b]) => `<button class="bgopt" data-bg="${id}" style="background:${(bgCache[id] || (bgCache[id] = b.css())).replace(/"/g, "'")}">${b.label}</button>`).join('')
+    + (custom ? `<button class="bgopt" data-bg="custom" style="background:url('${custom}')">내 이미지</button>` : '');
+  document.querySelectorAll('.bgopt').forEach(b => b.onclick = () => { localStorage.setItem('facegame-bg', b.dataset.bg); applyBg(); });
+  applyBg();
+}
+$('sBgFile').onchange = e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  const img = new Image(); const url = URL.createObjectURL(f);
+  img.onload = () => {
+    const k = Math.min(1, 1920 / Math.max(img.width, img.height)); const c = document.createElement('canvas');
+    c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    URL.revokeObjectURL(url);
+    let data = c.toDataURL('image/jpeg', 0.85);
+    try { localStorage.setItem('facegame-bg-img', data); }
+    catch { data = c.toDataURL('image/jpeg', 0.6); try { localStorage.setItem('facegame-bg-img', data); } catch { toast('이미지가 너무 커요. 더 작은 이미지를 골라주세요'); return; } }
+    localStorage.setItem('facegame-bg', 'custom'); paintBgOptions(); toast('배경을 바꿨어요');
+  };
+  img.src = url; e.target.value = '';
+};
+applyBg();
+
 /* ───────────── settings ───────────── */
 function openSettings() {
+  paintBgOptions();
   $('sTheme').value = state.theme || DEFAULT_THEME; $('sMinutes').value = cfg.minutes; $('sWeight').value = cfg.weight;
   $('sKey').value = cfg.key; $('sModel').value = cfg.model; $('sInfo').textContent = `방 코드 ${room} · ${DEMO ? '데모 모드' : 'Firebase 연결됨'}`;
   $('settings').classList.remove('hidden');
