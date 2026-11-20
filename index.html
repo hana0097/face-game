@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <script>/* auto-update: if a newer version is deployed, reload past the browser cache */
-window.APP_V = '5';
+window.APP_V = '6';
 fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
   const m = t.match(/APP_V = '(\d+)'/);
   if (m && m[1] !== window.APP_V && new URL(location.href).searchParams.get('v') !== m[1]) { const u = new URL(location.href); u.searchParams.set('v', m[1]); location.replace(u); }
@@ -11,7 +11,7 @@ fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }).then(r 
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>얼굴 그리기 대회</title>
-<link rel="stylesheet" href="shared.css?v=3">
+<link rel="stylesheet" href="shared.css?v=4">
 <style>
   body { background: #f4f1fb; overscroll-behavior: none; }
   .wrap { max-width: 480px; margin: 0 auto; min-height: 100%; padding: max(14px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; }
@@ -79,6 +79,9 @@ fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }).then(r 
   .oc { width: 26px; height: 26px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 1px #d6d0e8; }
   .oc.on { box-shadow: 0 0 0 3px var(--purple); }
   .picker { width: 100%; background: #fff; border-radius: 16px; padding: 10px 8px 4px; margin-top: 8px; box-shadow: 0 2px 8px rgba(80,60,160,.08); }
+  .ofit { white-space: nowrap; letter-spacing: -.04em; font-size: 10.5px; }
+  .picker .tools { gap: 6px; }
+  .oc { width: 23px; height: 23px; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
   .picker-t { font-weight: 800; font-size: 14px; text-align: left; padding-left: 6px; }
   .demo { background: #fff3c4; color: #8a6d00; font-size: 12px; padding: 6px 10px; border-radius: 10px; margin-bottom: 8px; text-align: center; }
 </style>
@@ -89,7 +92,7 @@ fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }).then(r 
 </div>
 
 <script type="module">
-import { initDB, DEMO, params, uid, esc, roomPath, avatarHTML, DEFAULT_THEME, OUTFITS, OUTFIT_COLORS, DEFAULT_OUTFIT, bodySVG } from './shared.js?v=3';
+import { initDB, DEMO, params, uid, esc, roomPath, avatarHTML, DEFAULT_THEME, OUTFITS, OUTFIT_COLORS, DEFAULT_OUTFIT, bodySVG } from './shared.js?v=4';
 
 const room = (params.get('room') || 'MAIN').toUpperCase();
 const R = roomPath(room);
@@ -128,6 +131,7 @@ function render(fromPlayers) {
   // host closed the round while I was still drawing → send what I have (full size)
   if (m && (phase === 'judging' || phase === 'results') && m.status !== 'submitted' && strokes.length && !autoSent) {
     autoSent = true;
+    db.set(`${R}/hd/${pid}`, exportPNG(1000)).catch(() => {});
     db.update(`${R}/players/${pid}`, { drawing: exportPNG(400), status: 'submitted', partial: true, submittedAt: db.now() });
   }
   let next;
@@ -188,7 +192,7 @@ function renderWait() {
 function pickerHTML() {
   return `<div class="picker"><div class="picker-t">👕 옷 고르기</div>
     <div class="tools" id="outfits">${OUTFITS.map(o => `<button class="ofit" data-o="${o.id}"><div class="ofit-prev">${bodySVG({ type: o.id, color: tool.outfit.color })}</div>${o.label}</button>`).join('')}</div>
-    <div class="tools">${OUTFIT_COLORS.map(c => `<button class="oc" data-oc="${c}" style="background:${c}" aria-label="옷 색"></button>`).join('')}</div></div>`;
+    <div class="tools">${OUTFIT_COLORS.map(c => `<button class="oc" data-oc="${c}" style="background:${c}" aria-label="${c === '#4870f5' ? 'NOL BLUE' : '옷 색'}">${c === '#4870f5' ? '<span style="font-size:8px;font-weight:900;color:#fff">NOL</span>' : ''}</button>`).join('')}</div></div>`;
 }
 function bindPicker(onChange) {
   const paint = () => {
@@ -337,6 +341,7 @@ function openSubmit() {
     const point = inp.value.trim();
     if (!point) { inp.focus(); inp.placeholder = '한 줄 설명을 꼭 적어주세요!'; return; }
     div.querySelector('#send').disabled = true;
+    db.set(`${R}/hd/${pid}`, exportPNG(1000)).catch(() => {}); // high-res copy for the archive
     await db.update(`${R}/players/${pid}`, { drawing: finalImg, point, status: 'submitted', submittedAt: db.now() });
     div.remove();
   };
@@ -390,7 +395,7 @@ function renderResults() {
     if (i >= 0) {
       const r = rk[i];
       html += `<div class="mine"><div>내 순위</div><div class="big">${i + 1}위 <small style="font-size:16px">/ ${rk.length}명 · ${r.final}점</small></div>
-        ${r.ai ? `<div style="margin-top:8px;font-size:14px;opacity:.95">🤖 "${esc(r.ai.comment || '')}"</div>` : ''}
+        ${(r.ai?.judges || (r.ai ? [{ emoji: '🤖', name: 'AI', comment: r.ai.comment }] : [])).map(j => `<div style="margin-top:8px;font-size:14px;opacity:.95;text-align:left">${j.emoji} <b>${esc(j.name)}</b>${j.total != null ? ` ${j.total}점` : ''}<br>"${esc(j.comment || '')}"</div>`).join('')}
         <div style="margin-top:6px;font-size:13px;opacity:.85">${r.ai ? `AI ${r.ai.total}점 · ` : ''}❤️ ${r.likes}</div></div>`;
     }
   }
