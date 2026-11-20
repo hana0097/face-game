@@ -37,12 +37,12 @@
   #qrMini { position: fixed; left: 24px; bottom: 24px; z-index: 15; padding: 14px; display: flex; gap: 14px; align-items: center; border-radius: 20px; }
   #qrMini .t { font-weight: 800; font-size: 18px; line-height: 1.4; }
 
-  #spot { position: fixed; right: 28px; top: 92px; z-index: 14; padding: 18px 20px 16px; width: 330px; text-align: center; transition: opacity .3s; }
-  #spot .lbl { font-weight: 800; color: var(--accent); font-size: 16px; }
-  #spot .img { width: 270px; height: 270px; margin: 6px auto; position: relative; }
+  #spot { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -46%); z-index: 14; padding: 22px 28px 20px; width: min(520px, 46vw); text-align: center; background: #fff; }
+  #spot .lbl { font-weight: 900; color: var(--accent); font-size: 26px; }
+  #spot .img { width: min(400px, 36vw, 52vh); height: min(400px, 36vw, 52vh); margin: 8px auto; position: relative; }
   #spot .img img { width: 100%; height: 100%; position: absolute; inset: 0; animation: pop .45s cubic-bezier(.3,1.6,.6,1); }
   @keyframes pop { from { transform: scale(.6); opacity: 0; } }
-  #spot .nm { font-size: 26px; font-weight: 900; }
+  #spot .nm { font-size: 40px; font-weight: 900; }
 
   #controls { position: fixed; right: 24px; bottom: 24px; z-index: 50; display: flex; gap: 12px; align-items: center; }
 
@@ -173,7 +173,7 @@
 <canvas id="confetti"></canvas>
 
 <script type="module">
-import { initDB, DEMO, params, uid, esc, roomPath, avatarHTML, DEFAULT_THEME, botFace, BOT_NAMES, BOT_POINTS } from './shared.js';
+import { initDB, DEMO, params, uid, esc, roomPath, avatarHTML, DEFAULT_THEME, botFace, BOT_NAMES, BOT_POINTS, randomOutfit } from './shared.js';
 
 /* ───────────── room & settings ───────────── */
 const genCode = () => Array.from({ length: 4 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
@@ -284,7 +284,7 @@ function onPlayers() {
   for (const p of all) {
     let b = bodies.get(p.id);
     const img = p.status === 'submitted' ? p.drawing : live[p.id] || '';
-    const key = `${p.name}|${p.status}|${img ? 1 : 0}|${state.phase}`;
+    const key = `${p.name}|${p.status}|${img ? 1 : 0}|${state.phase}|${JSON.stringify(p.outfit || null)}`;
     let isNew = false;
     if (!b) {
       const el = document.createElement('div'); el.className = 'av'; stage.appendChild(el);
@@ -293,7 +293,7 @@ function onPlayers() {
     }
     if (b.key !== key) {
       const wasSubmitted = b.key.includes('|submitted|');
-      b.el.innerHTML = avatarHTML({ name: p.name, img, drawing: p.status !== 'submitted' && state.phase === 'drawing' });
+      b.el.innerHTML = avatarHTML({ name: p.name, img, outfit: p.outfit, drawing: p.status !== 'submitted' && state.phase === 'drawing' });
       b.key = key; b.img = img;
       if (p.status === 'submitted' && !wasSubmitted && !isNew) talk(b, p.point, 4500, true);
     } else if (img && b.img !== img) { const im = b.el.querySelector('.av-head img'); if (im) im.src = img; b.img = img; }
@@ -302,6 +302,7 @@ function onPlayers() {
   }
   for (const [id, b] of bodies) if (!players[id]) { b.el.remove(); bodies.delete(id); }
   if (state.phase === 'judging') paintScan();
+  if (spotId && (!players[spotId] || players[spotId].status === 'submitted' || !live[spotId])) rotateSpot();
 }
 function talk(b, text, ms = 3800, force = false) {
   if (!text) return;
@@ -363,7 +364,7 @@ function rotateSpot() {
   const spot = $('spot');
   if (state.phase !== 'drawing') { spot.classList.add('hidden'); return; }
   const c = list().filter(p => p.status !== 'submitted' && live[p.id]);
-  if (!c.length) { spot.classList.add('hidden'); return; }
+  if (!c.length) { spot.classList.add('hidden'); spotId = null; return; }
   let pick = c[Math.floor(Math.random() * c.length)];
   if (c.length > 1 && pick.id === spotId) pick = c.find(p => p.id !== spotId);
   spotId = pick.id;
@@ -403,7 +404,7 @@ async function runJudge() {
     const t0 = Date.now();
     let scores;
     try { scores = await geminiJudge(sub); }
-    catch (e) { $('judgeMsg').textContent = '한 번 더 물어보는 중…'; await new Promise(r => setTimeout(r, 2500)); scores = await geminiJudge(sub); }
+    catch (e) { if (e.status || /키|key/i.test(e.message)) throw e; $('judgeMsg').textContent = '한 번 더 물어보는 중…'; await sleep(2500); scores = await geminiJudge(sub); }
     const wait = 3500 - (Date.now() - t0); if (wait > 0) await new Promise(r => setTimeout(r, wait)); // keep the suspense
     await publishResults(sub, scores, 'ai');
   } catch (e) {
@@ -415,10 +416,14 @@ async function runJudge() {
   } finally { judgingRunning = false; }
 }
 
-let resolvedModel = null;
-async function resolveModel(force = false) {
-  if (cfg.model !== 'auto' && !force) return cfg.model;
-  if (resolvedModel && !force) return resolvedModel;
+let autoModels = null;
+const FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'];
+async function modelCandidates() {
+  if (!autoModels) { try { autoModels = await listFlashModels(); } catch (e) { console.warn(e); autoModels = FALLBACK_MODELS; } }
+  const list = cfg.model !== 'auto' ? [cfg.model, ...autoModels] : [...autoModels];
+  return [...new Set(list)].slice(0, 4);
+}
+async function listFlashModels() {
   const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', { headers: { 'x-goog-api-key': cfg.key } });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(d?.error?.message || `HTTP ${r.status}`);
@@ -429,17 +434,31 @@ async function resolveModel(force = false) {
   if (!cands.length) throw new Error('사용할 수 있는 Gemini Flash 모델을 찾지 못했어요');
   const score = n => ver(n) * 100 - (/preview|exp/.test(n) ? 50 : 0) - (/lite/.test(n) ? 20 : 0) - (/-\d{3,}/.test(n) ? 5 : 0);
   cands.sort((a, b) => score(b) - score(a));
-  resolvedModel = cands[0]; return resolvedModel;
+  return cands;
 }
-async function callGemini(body) {
-  let model = await resolveModel();
-  const go = m => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': cfg.key }, body: JSON.stringify(body) });
-  let res = await go(model);
-  if (res.status === 404) { model = await resolveModel(true); res = await go(model); } // model retired → auto-pick
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error?.message || `HTTP ${res.status}`);
-  return { data, model };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+// Busy (503/429/500) → wait and retry, then move on to the next Flash model.
+async function callGemini(body, onBusy) {
+  const models = await modelCandidates(); let lastErr = null;
+  for (let i = 0; i < models.length; i++) {
+    const m = models[i];
+    for (let attempt = 0; attempt < 2; attempt++) {
+      let res, data;
+      try {
+        res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': cfg.key }, body: JSON.stringify(body) });
+        data = await res.json().catch(() => ({}));
+      } catch (e) { lastErr = new Error('네트워크 오류: ' + e.message); await sleep(2000); continue; }
+      if (res.ok) return { data, model: m };
+      lastErr = new Error(data?.error?.message || `HTTP ${res.status}`); lastErr.status = res.status;
+      if (res.status === 404) break;                         // retired model → next
+      if (![429, 500, 502, 503, 504].includes(res.status)) throw lastErr; // e.g. wrong key
+      onBusy && onBusy(i, attempt, m);
+      await sleep(attempt === 0 ? 3000 : 1000);
+    }
+  }
+  if (lastErr && [429, 500, 502, 503, 504].includes(lastErr.status)) lastErr.message = 'Gemini 서버가 지금 붐벼요. 1~2분 뒤 [다시 시도]를 눌러주세요. (' + lastErr.message + ')';
+  throw lastErr || new Error('Gemini 호출 실패');
 }
 
 async function geminiJudge(sub) {
@@ -466,7 +485,8 @@ async function geminiJudge(sub) {
     parts.push({ text: `[${i + 1}] id=${p.id} / 이름=${p.name} / 포인트="${p.point || ''}"` });
     parts.push({ inline_data: { mime_type: 'image/png', data: p.drawing.split(',')[1] } });
   });
-  const { data } = await callGemini({ contents: [{ role: 'user', parts }], generationConfig: { responseMimeType: 'application/json', temperature: 0.7 } });
+  const { data } = await callGemini({ contents: [{ role: 'user', parts }], generationConfig: { responseMimeType: 'application/json', temperature: 0.7 } },
+    (i, attempt) => { $('judgeMsg').textContent = attempt === 0 ? 'AI 심사위원이 바빠요… 잠시 후 다시 물어볼게요 ⏳' : '다른 AI 심사위원에게 부탁하는 중… 🔁'; });
   const text = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
   const m = text.match(/\[[\s\S]*\]/); if (!m) throw new Error('AI 응답을 해석하지 못했어요: ' + text.slice(0, 120));
   const arr = JSON.parse(m[0]); const out = {};
@@ -525,7 +545,7 @@ function renderReveal() {
     const bars = r.ai ? [['주제', r.ai.topic], ['창의성', r.ai.creativity], ['표현력', r.ai.expression], ['완성도', r.ai.completeness]]
       .map(([k, v]) => `<div class="bar"><span>${k}</span><div class="tr"><div class="fl" data-w="${v}"></div></div><span class="v">${v}</span></div>`).join('') : '';
     el.innerHTML = `<div class="rv"><div class="judge">AI JUDGE · 얼굴 그리기 대회</div><div class="rk">${idx + 1}위</div>
-      <div class="row"><div class="pic"><div class="av">${avatarHTML({ name: r.name, img: imgOf(r.id) })}</div></div>
+      <div class="row"><div class="pic"><div class="av">${avatarHTML({ name: r.name, img: imgOf(r.id), outfit: players[r.id]?.outfit })}</div></div>
       <div class="info"><div class="nm"><span class="medal m${idx + 1}">${idx + 1}</span>${esc(r.name)}</div>
       <div class="pt">「${esc(r.point)}」</div>${bars}
       ${r.ai?.comment ? `<div class="cmt">🤖 "${esc(r.ai.comment)}"</div>` : ''}
@@ -534,7 +554,7 @@ function renderReveal() {
     if (idx === 0) confetti();
     return;
   }
-  const pod = [1, 0, 2].filter(i => rk[i]).map(i => `<div class="pod p${i + 1}"><div class="av">${avatarHTML({ name: rk[i].name, img: imgOf(rk[i].id) })}</div><div class="stand" style="height:${[200, 150, 110][i]}px">${['🥇', '🥈', '🥉'][i]}<small>${fmt(rk[i])}</small></div></div>`).join('');
+  const pod = [1, 0, 2].filter(i => rk[i]).map(i => `<div class="pod p${i + 1}"><div class="av">${avatarHTML({ name: rk[i].name, img: imgOf(rk[i].id), outfit: players[rk[i].id]?.outfit })}</div><div class="stand" style="height:${[200, 150, 110][i]}px">${['🥇', '🥈', '🥉'][i]}<small>${fmt(rk[i])}</small></div></div>`).join('');
   const rest = rk.slice(3).map((r, i) => `<div><img src="${imgOf(r.id)}" alt="">${i + 4}위 ${esc(r.name)} · ${fmt(r)}</div>`).join('');
   el.innerHTML = `<div class="board"><h2>🏆 최종 순위</h2><div class="podium">${pod}</div><div class="rest">${rest}</div></div>`;
 }
@@ -584,7 +604,7 @@ $('sBots').onclick = async () => {
     const id = 'bot' + uid(); const face = botFace(400); const done = Math.random() < 0.6;
     const name = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)] + (Math.random() < .3 ? Math.floor(Math.random() * 9) : '');
     lv[id] = botFace(180);
-    upd[id] = { name, status: done ? 'submitted' : 'drawing', joinedAt: db.now(), ...(done ? { drawing: face, point: BOT_POINTS[Math.floor(Math.random() * BOT_POINTS.length)], submittedAt: db.now() } : {}) };
+    upd[id] = { name, status: done ? 'submitted' : 'drawing', joinedAt: db.now(), outfit: randomOutfit(), ...(done ? { drawing: face, point: BOT_POINTS[Math.floor(Math.random() * BOT_POINTS.length)], submittedAt: db.now() } : {}) };
   }
   await db.update(`${R}/players`, upd); await db.update(`${R}/live`, lv); toast('테스트 참가자 5명을 추가했어요');
 };
