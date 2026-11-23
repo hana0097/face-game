@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <script>/* auto-update: if a newer version is deployed, reload past the browser cache */
-window.APP_V = '8';
+window.APP_V = '9';
 fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
   const m = t.match(/APP_V = '(\d+)'/);
   if (m && m[1] !== window.APP_V && new URL(location.href).searchParams.get('v') !== m[1]) { const u = new URL(location.href); u.searchParams.set('v', m[1]); location.replace(u); }
@@ -148,6 +148,30 @@ fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }).then(r 
 </style>
 </head>
 <body>
+<div id="gate" style="position:fixed;inset:0;z-index:9999;background:#2c2a55;display:flex;align-items:center;justify-content:center">
+  <form id="gateForm" style="background:#fff;padding:32px 36px;border-radius:24px;text-align:center;width:min(380px,90vw)">
+    <div style="font-size:44px">🔒</div>
+    <h2 style="margin:8px 0 4px">진행자 전용 화면</h2>
+    <p style="color:#6b7280;margin:0 0 16px">비밀번호를 입력하세요</p>
+    <input id="gatePw" type="password" autocomplete="off" style="width:100%;padding:12px 14px;font-size:18px;border:2px solid #e2e0ee;border-radius:12px">
+    <div id="gateErr" style="color:#e85d5d;font-size:14px;height:20px;margin-top:6px"></div>
+    <button style="width:100%;border:0;background:#ff5a4e;color:#fff;font-size:18px;font-weight:800;padding:12px;border-radius:12px">입장</button>
+  </form>
+</div>
+<script>/* host password gate: only a hash is in the code; a device that unlocked once stays unlocked */
+window.HOST_UNLOCK = new Promise(res => {
+  const H = 'ea00e58384be538b8bee6a187b4a36ca000beb615fd789eb954a13f18e81a963', K = 'facegame-host-ok';
+  const done = () => { document.getElementById('gate').remove(); res(); };
+  try { if (localStorage.getItem(K) === H) return done(); } catch (e) {}
+  const sha = async s => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('facegame:' + s)))].map(b => b.toString(16).padStart(2, '0')).join('');
+  document.getElementById('gateForm').onsubmit = async e => {
+    e.preventDefault(); const inp = document.getElementById('gatePw');
+    if (await sha(inp.value.trim()) === H) { try { localStorage.setItem(K, H); } catch (e) {} done(); }
+    else { document.getElementById('gateErr').textContent = '비밀번호가 달라요'; inp.select(); }
+  };
+  setTimeout(() => document.getElementById('gatePw') && document.getElementById('gatePw').focus(), 50);
+});
+</script>
 <div id="stage"></div>
 <div id="top">
   <div class="title">🎨 얼굴 그리기 대회</div>
@@ -259,6 +283,7 @@ function paintQRs() {
 
 /* ───────────── boot ───────────── */
 (async () => {
+  await window.HOST_UNLOCK; // wait for the password gate
   db = await initDB();
   const s = await db.get(`${R}/state`);
   if (!s) await db.set(`${R}/state`, { phase: 'lobby', theme: DEFAULT_THEME, createdAt: db.now() });
