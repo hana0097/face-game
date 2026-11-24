@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <script>/* auto-update: if a newer version is deployed, reload past the browser cache */
-window.APP_V = '9';
+window.APP_V = '10';
 fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
   const m = t.match(/APP_V = '(\d+)'/);
   if (m && m[1] !== window.APP_V && new URL(location.href).searchParams.get('v') !== m[1]) { const u = new URL(location.href); u.searchParams.set('v', m[1]); location.replace(u); }
@@ -45,6 +45,13 @@ fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }).then(r 
   .skin.on { box-shadow: 0 0 0 3px var(--purple); }
   .board { position: relative; width: 100%; aspect-ratio: 1; border-radius: 20px; background: #fff; box-shadow: 0 6px 20px rgba(80,60,160,.12); overflow: hidden; touch-action: none; }
   .board canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+  .zw { position: absolute; inset: 0; transform-origin: 0 0; }
+  .zoombar { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 5px; z-index: 3; }
+  .zoombar button { width: 36px; height: 36px; border-radius: 10px; border: 0; background: rgba(255,255,255,.92); box-shadow: 0 2px 6px rgba(0,0,0,.18); font-size: 19px; font-weight: 900; color: #4b4f9e; padding: 0; }
+  .zlab { position: absolute; left: 10px; bottom: 12px; z-index: 3; background: rgba(43,47,58,.75); color: #fff; font-size: 12px; font-weight: 800; padding: 3px 8px; border-radius: 99px; pointer-events: none; }
+  .cpick { position: relative; overflow: hidden; background: conic-gradient(#f44, #fd3, #4c4, #3cf, #36f, #c4f, #f44) !important; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+  .cpick input { position: absolute; inset: -6px; width: 150%; height: 150%; opacity: 0; cursor: pointer; }
+  .cpick i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #fff; pointer-events: none; }
   .row { display: flex; gap: 8px; }
   .row .btn { margin-top: 10px; }
   .hint { font-size: 12px; color: var(--muted); text-align: center; margin-top: 4px; }
@@ -105,12 +112,12 @@ let pid = store.getItem(PID_KEY);
 let db, state = {}, players = {}, results = null, view = '';
 
 const S = 600; // internal canvas size
-const COLORS = ['#222222', '#6b4423', '#e53935', '#ff7aa8', '#ff9800', '#fdd835', '#43a047', '#1e88e5', '#8e24aa', '#ffffff'];
+const COLORS = ['#222222', '#6b4423', '#e53935', '#ff7aa8', '#ff9800', '#1e88e5', '#8e24aa', '#ffffff'];
 const SKINS = ['#f6d7b8', '#f1c27d', '#e0ac69', '#8d5524', '#ffffff'];
 const SIZES = [6, 14, 30];
-let tool = { color: COLORS[0], size: SIZES[1], eraser: false, skin: SKINS[0], outfit: { ...DEFAULT_OUTFIT } };
+let tool = { color: COLORS[0], size: SIZES[1], eraser: false, skin: SKINS[0], shape: 'egg', outfit: { ...DEFAULT_OUTFIT } };
 let strokes = [];
-try { const saved = JSON.parse(store.getItem(STROKE_KEY)); if (saved) { strokes = saved.strokes || []; tool.skin = saved.skin || tool.skin; if (saved.outfit) tool.outfit = saved.outfit; } } catch {}
+try { const saved = JSON.parse(store.getItem(STROKE_KEY)); if (saved) { strokes = saved.strokes || []; tool.skin = saved.skin || tool.skin; if (saved.shape) tool.shape = saved.shape; if (saved.outfit) tool.outfit = saved.outfit; } } catch {}
 
 const me = () => players?.[pid];
 const banner = () => (DEMO ? '<div class="demo">데모 모드: 같은 브라우저의 탭끼리만 연결돼요</div>' : '');
@@ -217,24 +224,32 @@ let base, ink, bctx, ictx, drawingNow = null, dirty = false, lastPush = 0, pushT
 function renderDraw() {
   app.innerHTML = `${banner()}<div class="brand">🎨 얼굴을 그려주세요 <small>${esc(me().name)}</small></div>
     <div class="theme">주제: <b id="themeTxt">${esc(state.theme || DEFAULT_THEME)}</b></div>
-    <div class="board" id="board"><canvas id="base" width="${S}" height="${S}"></canvas><canvas id="ink" width="${S}" height="${S}"></canvas></div>
-    <div class="tools" id="colors">${COLORS.map(c => `<button class="color" data-c="${c}" style="background:${c}" aria-label="색상"></button>`).join('')}</div>
+    <div class="board" id="board"><div class="zw" id="zw"><canvas id="base" width="${S}" height="${S}"></canvas><canvas id="ink" width="${S}" height="${S}"></canvas></div>
+      <div class="zlab hidden" id="zlab"></div>
+      <div class="zoombar"><button id="zOut" aria-label="축소">−</button><button id="zIn" aria-label="확대">+</button><button id="zReset" aria-label="원래 크기" style="font-size:14px">1:1</button></div></div>
+    <div class="tools" id="colors">${COLORS.map(c => `<button class="color" data-c="${c}" style="background:${c}" aria-label="색상"></button>`).join('')}<label class="color cpick" id="cpick" aria-label="색 고르기"><i id="cpickDot"></i><input type="color" id="cpickIn" value="#2e7d32"></label></div>
     <div class="tools">
       ${SIZES.map((s, i) => `<button class="tbtn size" data-s="${s}" aria-label="굵기"><i style="width:${6 + i * 6}px;height:${6 + i * 6}px"></i></button>`).join('')}
       <button class="tbtn" id="eraser">🩹 지우개</button>
       <button class="tbtn" id="undo">↩ 되돌리기</button>
       <button class="tbtn" id="clear">🗑</button>
     </div>
+    <div class="tools"><span style="font-size:12px;color:var(--muted)">얼굴형</span><button class="tbtn shape" data-sh="egg">🥚 달걀형</button><button class="tbtn shape" data-sh="round">⚪ 원형</button></div>
     <div class="tools"><span style="font-size:12px;color:var(--muted)">피부색</span>${SKINS.map(c => `<button class="skin" data-k="${c}" style="background:${c}" aria-label="피부색"></button>`).join('')}</div>
     ${pickerHTML()}
     <button class="btn" id="finish">다 그렸어요! ✨</button>
-    <div class="hint">그리는 동안 대형 화면에 랜덤으로 내 그림이 보여요</div>`;
+    <div class="hint">두 손가락으로 벌리면 확대 · 이동돼요 🔍<br>그리는 동안 대형 화면에 랜덤으로 내 그림이 보여요</div>`;
   base = document.getElementById('base'); ink = document.getElementById('ink');
   bctx = base.getContext('2d'); ictx = ink.getContext('2d');
   drawBase(); redraw(); syncTools(); bindPicker(); syncOutfit();
 
-  document.querySelectorAll('.color').forEach(b => b.onclick = () => { tool.color = b.dataset.c; tool.eraser = false; syncTools(); });
+  document.querySelectorAll('.color[data-c]').forEach(b => b.onclick = () => { tool.color = b.dataset.c; tool.eraser = false; syncTools(); });
+  const cpIn = document.getElementById('cpickIn');
+  if (!COLORS.includes(tool.color)) cpIn.value = tool.color;
+  cpIn.oninput = cpIn.onchange = () => { tool.color = cpIn.value; tool.eraser = false; syncTools(); };
+  document.getElementById('cpick').onclick = () => { if (tool.eraser || tool.color !== cpIn.value) { tool.color = cpIn.value; tool.eraser = false; syncTools(); } };
   document.querySelectorAll('.size').forEach(b => b.onclick = () => { tool.size = +b.dataset.s; syncTools(); });
+  document.querySelectorAll('.shape').forEach(b => b.onclick = () => { tool.shape = b.dataset.sh; drawBase(); saveLocal(); dirty = true; schedulePush(); syncTools(); });
   document.querySelectorAll('.skin').forEach(b => b.onclick = () => { tool.skin = b.dataset.k; drawBase(); saveLocal(); dirty = true; schedulePush(); syncTools(); });
   document.getElementById('eraser').onclick = () => { tool.eraser = !tool.eraser; syncTools(); };
   document.getElementById('undo').onclick = () => { strokes.pop(); redraw(); saveLocal(); dirty = true; schedulePush(); };
@@ -242,13 +257,39 @@ function renderDraw() {
   document.getElementById('finish').onclick = openSubmit;
 
   const pos = e => { const r = ink.getBoundingClientRect(); return [Math.round((e.clientX - r.left) / r.width * S), Math.round((e.clientY - r.top) / r.height * S)]; };
+  // ── zoom: pinch with two fingers (or + / − buttons, mouse wheel); one finger draws ──
+  const board = document.getElementById('board'), zw = document.getElementById('zw'), zlab = document.getElementById('zlab');
+  const Z = { k: 1, x: 0, y: 0 }, pts = new Map(); let gest = null, noDraw = false;
+  const applyZ = () => {
+    const W = board.clientWidth, H = board.clientHeight;
+    Z.k = Math.min(5, Math.max(1, Z.k)); Z.x = Math.min(0, Math.max(W - W * Z.k, Z.x)); Z.y = Math.min(0, Math.max(H - H * Z.k, Z.y));
+    zw.style.transform = `translate(${Z.x}px, ${Z.y}px) scale(${Z.k})`;
+    zlab.textContent = `${Z.k.toFixed(1)}배`; zlab.classList.toggle('hidden', Z.k < 1.05);
+  };
+  const zoomAt = (k, cx, cy) => { const nk = Math.min(5, Math.max(1, k)); Z.x = cx - (cx - Z.x) * nk / Z.k; Z.y = cy - (cy - Z.y) * nk / Z.k; Z.k = nk; applyZ(); };
+  const center = () => [board.clientWidth / 2, board.clientHeight / 2];
+  document.getElementById('zIn').onclick = () => zoomAt(Z.k * 1.5, ...center());
+  document.getElementById('zOut').onclick = () => zoomAt(Z.k / 1.5, ...center());
+  document.getElementById('zReset').onclick = () => { Z.k = 1; Z.x = Z.y = 0; applyZ(); };
+  board.onwheel = e => { e.preventDefault(); const r = board.getBoundingClientRect(); zoomAt(Z.k * (e.deltaY < 0 ? 1.15 : 1 / 1.15), e.clientX - r.left, e.clientY - r.top); };
+  const bpt = e => { const r = board.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+  const gestInfo = () => { const [a, b] = [...pts.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, m: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } }; };
   ink.onpointerdown = e => {
-    if (drawingNow) return;
-    ink.setPointerCapture(e.pointerId);
+    try { ink.setPointerCapture(e.pointerId); } catch {} pts.set(e.pointerId, bpt(e));
+    if (pts.size >= 2) { // second finger → cancel the stroke in progress and start pinch/pan
+      if (drawingNow) { drawingNow = null; redraw(); }
+      const g = gestInfo(); gest = { ...g, k: Z.k, x: Z.x, y: Z.y }; noDraw = true; return;
+    }
+    if (drawingNow || noDraw) return;
     drawingNow = { c: tool.color, w: tool.size, e: tool.eraser ? 1 : 0, p: [pos(e)], id: e.pointerId };
     drawStroke(ictx, drawingNow, true);
   };
   ink.onpointermove = e => {
+    if (pts.has(e.pointerId)) pts.set(e.pointerId, bpt(e));
+    if (gest && pts.size >= 2) {
+      const g = gestInfo(), nk = Math.min(5, Math.max(1, gest.k * g.d / gest.d));
+      Z.x = g.m.x - (gest.m.x - gest.x) * nk / gest.k; Z.y = g.m.y - (gest.m.y - gest.y) * nk / gest.k; Z.k = nk; applyZ(); return;
+    }
     if (!drawingNow || e.pointerId !== drawingNow.id) return;
     const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
     for (const ev of evs) drawingNow.p.push(pos(ev));
@@ -257,6 +298,9 @@ function renderDraw() {
     segment(ictx, drawingNow, p[Math.max(0, n - evs.length - 1)], p.slice(Math.max(0, n - evs.length)));
   };
   const end = e => {
+    pts.delete(e.pointerId);
+    if (pts.size < 2) gest = null;
+    if (pts.size === 0) noDraw = false;
     if (!drawingNow || e.pointerId !== drawingNow.id) return;
     const { id, ...st } = drawingNow; strokes.push(st); drawingNow = null;
     redraw(); saveLocal(); dirty = true; schedulePush();
@@ -267,15 +311,26 @@ function renderDraw() {
   if (strokes.length) { dirty = true; pushLive(); }
 }
 function syncTools() {
-  document.querySelectorAll('.color').forEach(b => b.classList.toggle('on', !tool.eraser && b.dataset.c === tool.color));
+  document.querySelectorAll('.color[data-c]').forEach(b => b.classList.toggle('on', !tool.eraser && b.dataset.c === tool.color));
+  const cp = document.getElementById('cpick');
+  if (cp) { const custom = !COLORS.includes(tool.color); cp.classList.toggle('on', !tool.eraser && custom); document.getElementById('cpickDot').style.background = custom ? tool.color : document.getElementById('cpickIn').value; }
   document.querySelectorAll('.size').forEach(b => b.classList.toggle('on', +b.dataset.s === tool.size));
   document.querySelectorAll('.skin').forEach(b => b.classList.toggle('on', b.dataset.k === tool.skin));
+  document.querySelectorAll('.shape').forEach(b => b.classList.toggle('on', b.dataset.sh === (tool.shape || 'egg')));
   document.getElementById('eraser').classList.toggle('on', tool.eraser);
 }
 function drawBase(ctx = bctx, size = S) {
   ctx.clearRect(0, 0, size, size);
   ctx.fillStyle = tool.skin;
-  ctx.beginPath(); ctx.arc(size / 2, size * 0.53, size * 0.4, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath();
+  if (tool.shape === 'round') ctx.arc(size / 2, size * 0.53, size * 0.4, 0, Math.PI * 2);
+  else { // egg: wider forehead, softer narrower chin
+    const cx = size / 2, t = size * 0.11, b = size * 0.94;
+    ctx.moveTo(cx, t);
+    ctx.bezierCurveTo(cx + size * 0.41, t, cx + size * 0.39, b - size * 0.11, cx, b);
+    ctx.bezierCurveTo(cx - size * 0.39, b - size * 0.11, cx - size * 0.41, t, cx, t);
+  }
+  ctx.fill();
   if (ctx === bctx) { // faint guide (not exported)
     ctx.strokeStyle = 'rgba(0,0,0,.06)'; ctx.lineWidth = 3; ctx.setLineDash([10, 12]);
     ctx.beginPath(); ctx.moveTo(size / 2, size * 0.2); ctx.lineTo(size / 2, size * 0.9); ctx.moveTo(size * 0.18, size * 0.5); ctx.lineTo(size * 0.82, size * 0.5); ctx.stroke(); ctx.setLineDash([]);
@@ -300,7 +355,7 @@ function segment(ctx, st, from, pts) {
   pts.forEach(q => ctx.lineTo(q[0], q[1])); ctx.stroke(); ctx.globalCompositeOperation = 'source-over';
 }
 function redraw() { ictx.clearRect(0, 0, S, S); strokes.forEach(s => drawStroke(ictx, s)); }
-function saveLocal() { try { store.setItem(STROKE_KEY, JSON.stringify({ strokes, skin: tool.skin, outfit: tool.outfit })); } catch {} }
+function saveLocal() { try { store.setItem(STROKE_KEY, JSON.stringify({ strokes, skin: tool.skin, shape: tool.shape, outfit: tool.outfit })); } catch {} }
 
 function exportPNG(size) {
   const c = document.createElement('canvas'); c.width = c.height = size; const ctx = c.getContext('2d');
