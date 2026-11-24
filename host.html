@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <script>/* auto-update: if a newer version is deployed, reload past the browser cache */
-window.APP_V = '9';
+window.APP_V = '10';
 fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
   const m = t.match(/APP_V = '(\d+)'/);
   if (m && m[1] !== window.APP_V && new URL(location.href).searchParams.get('v') !== m[1]) { const u = new URL(location.href); u.searchParams.set('v', m[1]); location.replace(u); }
