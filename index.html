@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <script>/* auto-update: if a newer version is deployed, reload past the browser cache */
-window.APP_V = '10';
+window.APP_V = '11';
 fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
   const m = t.match(/APP_V = '(\d+)'/);
   if (m && m[1] !== window.APP_V && new URL(location.href).searchParams.get('v') !== m[1]) { const u = new URL(location.href); u.searchParams.set('v', m[1]); location.replace(u); }
@@ -44,6 +44,11 @@ fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }).then(r 
   .skin { width: 26px; height: 26px; border-radius: 8px; border: 2px solid #fff; box-shadow: 0 0 0 1px #d6d0e8; }
   .skin.on { box-shadow: 0 0 0 3px var(--purple); }
   .board { position: relative; width: 100%; aspect-ratio: 1; border-radius: 20px; background: #fff; box-shadow: 0 6px 20px rgba(80,60,160,.12); overflow: hidden; touch-action: none; }
+  #colors { flex-wrap: nowrap; gap: 6px; }
+  #colors .color { width: 29px; height: 29px; flex: none; }
+  .tools.row1 { flex-wrap: nowrap; gap: 5px; }
+  .tools.row1 .tbtn { padding: 7px 9px; font-size: 13px; white-space: nowrap; gap: 3px; border-radius: 10px; }
+  .tools.row1 .size { width: 32px; height: 32px; padding: 0; flex: none; }
   .board canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
   .zw { position: absolute; inset: 0; transform-origin: 0 0; }
   .zoombar { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 5px; z-index: 3; }
@@ -228,7 +233,7 @@ function renderDraw() {
       <div class="zlab hidden" id="zlab"></div>
       <div class="zoombar"><button id="zOut" aria-label="축소">−</button><button id="zIn" aria-label="확대">+</button><button id="zReset" aria-label="원래 크기" style="font-size:14px">1:1</button></div></div>
     <div class="tools" id="colors">${COLORS.map(c => `<button class="color" data-c="${c}" style="background:${c}" aria-label="색상"></button>`).join('')}<label class="color cpick" id="cpick" aria-label="색 고르기"><i id="cpickDot"></i><input type="color" id="cpickIn" value="#2e7d32"></label></div>
-    <div class="tools">
+    <div class="tools row1">
       ${SIZES.map((s, i) => `<button class="tbtn size" data-s="${s}" aria-label="굵기"><i style="width:${6 + i * 6}px;height:${6 + i * 6}px"></i></button>`).join('')}
       <button class="tbtn" id="eraser">🩹 지우개</button>
       <button class="tbtn" id="undo">↩ 되돌리기</button>
